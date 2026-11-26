@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="is">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex,nofollow">
+  <link rel="icon" href="favicon.svg">
+  <meta name="theme-color" content="#0a0f1f">
+  <title>Stjórnborð - Rafvirkja Leikur</title>
+  <style>
+    * { box-sizing: border-box; }
+    body { margin: 0; background: radial-gradient(1000px 500px at 50% -10%, #1a2a66, #0a0f1f 60%) fixed; color: #eef2ff; font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; min-height: 100vh; }
+    header { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; padding: 14px 16px; }
+    h1 { margin: 0; font-size: 22px; flex: 1; min-width: 200px; }
+    h1 span { color: #ffe14a; }
+    .meta { color: #98a4cf; font-size: 13px; }
+    button { font: inherit; font-weight: 800; color: #eef2ff; background: linear-gradient(180deg, #2a3768, #202a52); border: 1px solid rgba(160,185,255,.3); border-radius: 12px; padding: 8px 14px; cursor: pointer; }
+    button:active { transform: scale(.97); }
+    .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 10px; padding: 0 16px 12px; }
+    .card { background: #161e3b; border: 1px solid rgba(120,150,255,.16); border-radius: 14px; padding: 10px 12px; }
+    .card small { display: block; color: #98a4cf; font-size: 11px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; }
+    .card b { font-size: 22px; color: #39ff8a; font-family: ui-monospace, Menlo, Consolas, monospace; }
+    .wrap { overflow-x: auto; padding: 0 16px 24px; }
+    table { border-collapse: separate; border-spacing: 0; width: 100%; min-width: 980px; background: #121935; border: 1px solid rgba(120,150,255,.16); border-radius: 14px; overflow: hidden; }
+    th, td { padding: 9px 10px; text-align: left; white-space: nowrap; border-bottom: 1px solid rgba(120,150,255,.1); font-size: 14px; }
+    th { background: #1a2348; color: #98a4cf; font-size: 12px; letter-spacing: .06em; text-transform: uppercase; cursor: pointer; user-select: none; position: sticky; top: 0; }
+    th.sorted { color: #ffe14a; }
+    td.n { text-align: right; font-family: ui-monospace, Menlo, Consolas, monospace; }
+    th.n { text-align: right; }
+    tr:hover td { background: rgba(34,230,255,.06); }
+    .pos { color: #39ff8a; } .neg { color: #ff4d6d; }
+    .online { color: #39ff8a; font-weight: 800; }
+    .empty, .err { padding: 20px 16px; color: #98a4cf; }
+    .err { color: #ff4d6d; }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Stjórnborð <span>Rafvirkja Leikur</span></h1>
+    <div class="meta" id="meta">Hleð...</div>
+    <button type="button" id="refresh">Uppfæra</button>
+  </header>
+  <div class="cards" id="cards"></div>
+  <div class="wrap"><table id="tbl"><thead></thead><tbody></tbody></table><div id="msg"></div></div>
+  <script>
+  (function () {
+    "use strict";
+    var URL_BASE = "https://dvmufututcxyanfovikm.supabase.co/rest/v1/rl_players";
+    var KEY = "sb_publishable_SLYw8G5BqYlbUgB793AXfA_jEXCmX93";
+    var COLS = [
+      { k: "name", t: "Nafn" },
+      { k: "title", t: "Titill" },
+      { k: "level", t: "Þrep", n: 1 },
+      { k: "xp", t: "Reynsla", n: 1 },
+      { k: "cash", t: "Peningar", n: 1, money: 1 },
+      { k: "net_worth", t: "Eignir", n: 1, money: 1 },
+      { k: "best_score", t: "Besta stig", n: 1 },
+      { k: "days_played", t: "Dagar", n: 1 },
+      { k: "jobs_done", t: "Verk", n: 1 },
+      { k: "achievements", t: "Afrek", n: 1 },
+      { k: "house", t: "Hús" },
+      { k: "last_seen", t: "Sást síðast", time: 1 },
+      { k: "created_at", t: "Byrjaði", time: 1 }
+    ];
+    var rows = [];
+    var sortKey = "last_seen";
+    var sortDir = -1;
+    var thead = document.querySelector("#tbl thead");
+    var tbody = document.querySelector("#tbl tbody");
+
+    function fmt(n) {
+      var v = Math.abs(Math.round(Number(n) || 0));
+      return (n < 0 ? "-" : "") + String(v).replace(/\B(?=(\d{3})+(?!\d))/g, ".");
+    }
+    function ago(iso) {
+      var s = Math.max(0, Math.round((Date.now() - new Date(iso).getTime()) / 1000));
+      if (s < 90) return "núna";
+      if (s < 3600) return Math.round(s / 60) + " mín. síðan";
+      if (s < 86400) return Math.round(s / 3600) + " klst. síðan";
+      return Math.round(s / 86400) + " d. síðan";
+    }
+    function stamp(iso) {
+      var d = new Date(iso);
+      var p = function (x) { return (x < 10 ? "0" : "") + x; };
+      return d.getFullYear() + "-" + p(d.getMonth() + 1) + "-" + p(d.getDate()) + " " + p(d.getHours()) + ":" + p(d.getMinutes());
+    }
+    function cell(tr, text, cls) {
+      var td = document.createElement("td");
+      td.textContent = text;
+      if (cls) td.className = cls;
+      tr.appendChild(td);
+    }
+
+    function drawHead() {
+      thead.innerHTML = "";
+      var tr = document.createElement("tr");
+      COLS.forEach(function (c) {
+        var th = document.createElement("th");
+        th.textContent = c.t + (sortKey === c.k ? (sortDir > 0 ? " \u25b2" : " \u25bc") : "");
+        if (c.n) th.className = "n";
+        if (sortKey === c.k) th.className += " sorted";
+        th.addEventListener("click", function () {
+          if (sortKey === c.k) sortDir = -sortDir;
+          else { sortKey = c.k; sortDir = c.n || c.time ? -1 : 1; }
+          draw();
+        });
+        tr.appendChild(th);
+      });
+      thead.appendChild(tr);
+    }
+
+    function draw() {
+      drawHead();
+      var list = rows.slice().sort(function (a, b) {
+        var x = a[sortKey], y = b[sortKey];
+        if (typeof x === "string" && typeof y === "string") return x.localeCompare(y, "is") * sortDir;
+        return ((x > y) - (x < y)) * sortDir;
+      });
+      tbody.innerHTML = "";
+      list.forEach(function (r) {
+        var tr = document.createElement("tr");
+        COLS.forEach(function (c) {
+          var v = r[c.k];
+          if (c.time) cell(tr, stamp(v) + " (" + ago(v) + ")", Date.now() - new Date(v).getTime() < 300000 && c.k === "last_seen" ? "online" : "");
+          else if (c.n) cell(tr, fmt(v), "n" + (c.money ? (v < 0 ? " neg" : " pos") : ""));
+          else cell(tr, v || "-");
+        });
+        tbody.appendChild(tr);
+      });
+      document.getElementById("msg").innerHTML = rows.length ? "" : '<div class="empty">Engir spilarar enn.</div>';
+      var online = rows.filter(function (r) { return Date.now() - new Date(r.last_seen).getTime() < 300000; }).length;
+      var today = rows.filter(function (r) { return Date.now() - new Date(r.last_seen).getTime() < 86400000; }).length;
+      var best = rows.reduce(function (m, r) { return Math.max(m, r.best_score); }, 0);
+      var avg = rows.length ? rows.reduce(function (m, r) { return m + r.days_played; }, 0) / rows.length : 0;
+      var cards = [["Spilarar", rows.length], ["Á netinu núna", online], ["Síðasta sólarhring", today], ["Hæsta stig", fmt(best)], ["Meðaltal daga", avg.toFixed(1)]];
+      var box = document.getElementById("cards");
+      box.innerHTML = "";
+      cards.forEach(function (c) {
+        var d = document.createElement("div");
+        d.className = "card";
+        var s = document.createElement("small"); s.textContent = c[0];
+        var b = document.createElement("b"); b.textContent = String(c[1]);
+        d.appendChild(s); d.appendChild(b);
+        box.appendChild(d);
+      });
+    }
+
+    function load() {
+      fetch(URL_BASE + "?select=*&order=last_seen.desc&limit=1000", { headers: { apikey: KEY } })
+        .then(function (r) { if (!r.ok) throw new Error("HTTP " + r.status); return r.json(); })
+        .then(function (data) {
+          rows = data;
+          draw();
+          document.getElementById("meta").textContent = "Uppfært " + new Date().toLocaleTimeString("is-IS") + ". Endurnýjast á 30 sek. fresti.";
+        })
+        .catch(function (e) {
+          document.getElementById("meta").innerHTML = "";
+          var m = document.getElementById("msg");
+          m.innerHTML = "";
+          var d = document.createElement("div");
+          d.className = "err";
+          d.textContent = "Tókst ekki að sækja gögn (" + e.message + "). Reyni aftur.";
+          m.appendChild(d);
+        });
+    }
+    document.getElementById("refresh").addEventListener("click", load);
+    drawHead();
+    load();
+    setInterval(load, 30000);
+  })();
+  </script>
+</body>
+</html>

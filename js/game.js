@@ -7,6 +7,24 @@
   var Meta = null;
   var ui = { tab: "markadur", qty: "1", lock: false, jobUid: null, pendingJob: null };
   var gesture = { x: 0, y: 0, moved: false };
+  var C = window.RafCloud;
+  var prevLed = {};
+  var GOOD_ICON = {
+    innstunga: "\ud83d\udd0c", rofi: "\ud83d\udca1", lekavardi: "\ud83d\udee1\ufe0f", sjalfvari: "\ud83d\udd18",
+    tafla: "\ud83c\udf9b\ufe0f", kapall15: "\u27b0", kapall25: "\u27b0", kapall510: "\ud83e\uddf5", ror: "\ud83d\udd29",
+    led: "\ud83d\udd06", hledsla: "\ud83d\udd0b", pumpa: "\u2668\ufe0f", maelitaki: "\ud83d\udcdf", solar: "\u2600\ufe0f", snertill: "\ud83e\uddf2"
+  };
+  var LOC_ICON = {
+    reykjavik: "\ud83c\udfd9\ufe0f", hafnarfjordur: "\u2693", kopavogur: "\ud83c\udfe2", akureyri: "\u26f0\ufe0f",
+    selfoss: "\ud83c\udf3e", keflavik: "\u2708\ufe0f", egilsstadir: "\ud83c\udf32", isafjordur: "\u2744\ufe0f"
+  };
+  var JOB_ICON = {
+    litir: "\ud83c\udfa8", nod: "\ud83d\udea8", bilun: "\ud83d\udd0d", heimili: "\ud83c\udfe0", idnadur: "\ud83c\udfed",
+    fasar: "\ud83d\udd00", leidsla: "\ud83e\udded", hledsla: "\ud83d\udd0c", pumpa: "\u2668\ufe0f", virkjun: "\u26a1"
+  };
+  var HOUSE_ICON = { kjallari: "\ud83d\udeaa", ibud: "\ud83c\udfe2", radhus: "\ud83c\udfd8\ufe0f", einbyli: "\ud83c\udfe1", villa: "\ud83c\udff0" };
+  function ico(map, id, fallback) { return '<span class="ico" aria-hidden="true">' + (map[id] || fallback) + "</span>"; }
+  var reduceMotion = !!(window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches);
 
   function loadMeta() {
     try {
@@ -94,6 +112,7 @@
     (res.challenges || []).forEach(function (c) { toast("Áskorun. " + c.label, "gold"); });
     if ((res.gained && res.gained.length) || (res.challenges && res.challenges.length)) {
       if (sfx()) sfx().win();
+      cloudSync(false);
     }
   }
 
@@ -114,6 +133,67 @@
     document.getElementById("app").innerHTML = appHTML(!!opts.pop);
     var main2 = document.querySelector(".main");
     if (opts.keepScroll && main2) main2.scrollTop = y;
+    tickLeds();
+  }
+
+  function tween(el, from, to, fmt) {
+    if (reduceMotion || from === to) { el.textContent = fmt(to); return; }
+    var t0 = performance.now();
+    var dur = 520;
+    function step(now) {
+      var k = Math.min(1, (now - t0) / dur);
+      var e = 1 - Math.pow(1 - k, 3);
+      el.textContent = fmt(Math.round(from + (to - from) * e));
+      if (k < 1 && el.isConnected) requestAnimationFrame(step);
+    }
+    requestAnimationFrame(step);
+  }
+
+  function tickLeds() {
+    var els = document.querySelectorAll("[data-led]");
+    for (var i = 0; i < els.length; i++) {
+      var key = els[i].getAttribute("data-led");
+      var to = Number(els[i].getAttribute("data-v"));
+      var from = typeof prevLed[key] === "number" ? prevLed[key] : to;
+      prevLed[key] = to;
+      if (from !== to) {
+        els[i].classList.add(to > from ? "up" : "down");
+        tween(els[i], from, to, L.formatNum);
+      }
+    }
+  }
+
+  function countUps(root) {
+    var els = root.querySelectorAll("[data-count]");
+    for (var i = 0; i < els.length; i++) {
+      var to = Number(els[i].getAttribute("data-count"));
+      var mode = els[i].getAttribute("data-mode");
+      var fmt = mode === "xp" ? function (n) { return "+" + n + " reynsla"; } : (mode === "krs" ? L.formatKrSigned : L.formatKr);
+      tween(els[i], 0, to, fmt);
+    }
+  }
+
+  function burst(host) {
+    if (reduceMotion || !host) return;
+    var box = document.createElement("div");
+    box.className = "burst";
+    var colors = ["#ffe14a", "#22e6ff", "#ff4fd8", "#7dff7a", "#ffffff"];
+    for (var i = 0; i < 28; i++) {
+      var p = document.createElement("i");
+      var ang = (i / 28) * Math.PI * 2 + Math.random() * 0.4;
+      var dist = 90 + Math.random() * 120;
+      p.style.setProperty("--dx", Math.round(Math.cos(ang) * dist) + "px");
+      p.style.setProperty("--dy", Math.round(Math.sin(ang) * dist - 30) + "px");
+      p.style.background = colors[i % colors.length];
+      p.style.animationDelay = (Math.random() * 0.08) + "s";
+      box.appendChild(p);
+    }
+    host.appendChild(box);
+    setTimeout(function () { if (box.parentNode) box.parentNode.removeChild(box); }, 1400);
+  }
+
+  function cloudSync(now) {
+    if (C) C.sync(S, Meta, L, !!now);
   }
 
   function goalHTML() {
@@ -134,21 +214,30 @@
       "</button>";
   }
 
+  function ledHTML(key, cls, label, val) {
+    return '<div class="led ' + cls + '"><span>' + label + '</span><b data-led="' + key + '" data-v="' + val + '">' + L.formatNum(val) + "</b></div>";
+  }
+
   function headerHTML(pop) {
     var used = L.usedSpace(S);
     var cap = L.capacity(S);
     var hot = used >= cap ? " hot" : "";
+    var lv = L.levelOf(S.xp);
+    var xpPct = lv.next ? Math.max(3, Math.min(100, Math.round(((S.xp - lv.current.xp) / (lv.next.xp - lv.current.xp)) * 100))) : 100;
     return '<header class="top">' +
       '<div class="titlebar">' +
-      '<div class="title">Rafvirkja Leikur</div>' +
+      '<div class="lvl" title="Þrep"><b>' + lv.current.level + '</b></div>' +
+      '<div class="who"><div class="title">' + L.esc(lv.current.title) + '</div>' +
+      '<div class="xpbar"><span style="width:' + xpPct + '%"></span></div></div>' +
       '<div class="day">' + L.esc(L.dayLabel(S)) + "</div>" +
-      (S.combo >= 2 ? '<div class="combo">Röð ' + S.combo + "</div>" : "") +
-      '<button type="button" class="iconbtn' + (Meta.sound ? "" : " off") + '" data-act="sound" aria-label="Hljóð">♪</button>' +
+      (S.combo >= 2 ? '<div class="combo">\ud83d\udd25 ' + S.combo + "</div>" : "") +
+      '<button type="button" class="iconbtn" data-act="board" aria-label="Stigatafla">\ud83c\udfc6</button>' +
+      '<button type="button" class="iconbtn' + (Meta.sound ? "" : " off") + '" data-act="sound" aria-label="Hljóð">\u266a</button>' +
       "</div>" +
       '<div class="leds' + (pop ? " pop" : "") + '">' +
-      '<div class="led g"><span>PENINGAR</span><b>' + L.formatNum(S.cash) + "</b></div>" +
-      '<div class="led g"><span>BANKI</span><b>' + L.formatNum(S.bank) + "</b></div>" +
-      '<div class="led r"><span>SKULD</span><b>' + L.formatNum(S.debt) + "</b></div>" +
+      ledHTML("cash", "g", "PENINGAR", S.cash) +
+      ledHTML("bank", "g", "BANKI", S.bank) +
+      ledHTML("debt", "r", "SKULD", S.debt) +
       '<div class="led y' + hot + '"><span>BÍLL</span><b>' + used + "/" + cap + "</b></div>" +
       "</div>" +
       '<div class="rep"><span>Orðstír</span><div class="repbar"><span style="width:' + S.rep + '%"></span></div></div>' +
@@ -164,10 +253,10 @@
       return c;
     }
     return '<nav class="nav">' +
-      '<button type="button" class="' + cls("markadur") + '" data-act="tab" data-id="markadur">Markaður</button>' +
-      '<button type="button" class="' + cls("verk") + '" data-act="tab" data-id="verk">Verk</button>' +
-      '<button type="button" class="' + cls("hus") + '" data-act="tab" data-id="hus">Hús</button>' +
-      '<button type="button" class="' + cls("meira") + '" data-act="tab" data-id="meira">Meira</button>' +
+      '<button type="button" class="' + cls("markadur") + '" data-act="tab" data-id="markadur"><i>\ud83d\uded2</i>Markaður</button>' +
+      '<button type="button" class="' + cls("verk") + '" data-act="tab" data-id="verk"><i>\ud83d\udd27</i>Verk</button>' +
+      '<button type="button" class="' + cls("hus") + '" data-act="tab" data-id="hus"><i>\ud83c\udfe0</i>Hús</button>' +
+      '<button type="button" class="' + cls("meira") + '" data-act="tab" data-id="meira"><i>\u2b50</i>Meira</button>' +
       "</nav>";
   }
 
@@ -185,7 +274,7 @@
       var here = loc.id === S.loc;
       var pulse = coach === "travel" && !here ? " pulse" : "";
       return '<button type="button" class="city' + (here ? " here" : "") + pulse + '" data-act="go" data-id="' + loc.id + '"' +
-        (here ? " disabled" : "") + "><b>" + L.esc(loc.name) + '</b><span class="tip">' + L.esc(loc.tip) + "</span></button>";
+        (here ? " disabled" : "") + ">" + ico(LOC_ICON, loc.id, "\ud83d\udccd") + "<b>" + L.esc(loc.name) + '</b><span class="tip">' + L.esc(loc.tip) + "</span></button>";
     }).join("");
     var qtys = ["1", "5", "allt"].map(function (q) {
       var label = q === "allt" ? "Allt" : q;
@@ -212,7 +301,7 @@
         var d = row.price - row.avg;
         diff = '<div class="gdiff ' + (d >= 0 ? "cheap" : "pricey") + '">' + L.formatKrSigned(d) + "</div>";
       }
-      return '<div class="good"><div class="ginfo"><div class="gname">' + L.esc(g.name) +
+      return '<div class="good">' + ico(GOOD_ICON, g.id, "\ud83d\udd27") + '<div class="ginfo"><div class="gname">' + L.esc(g.name) +
         (tag ? ' <em class="tag ' + tagCls + '">' + tag + "</em>" : "") +
         '</div><div class="gprice ' + tagCls + '">' + L.formatKr(row.price) + "</div>" +
         '<div class="gmeta">Á lager ' + row.owned + "</div>" + diff +
@@ -240,7 +329,8 @@
     var cards = (S.jobs || []).map(function (job) {
       var info = L.matInfo(S, job);
       return '<button type="button" class="jobcard' + (job.jackpot ? " jack" : "") + '" data-act="job" data-id="' + L.esc(job.uid) + '">' +
-        (job.jackpot ? '<div class="badge">Stórsamningur</div>' : "") +
+        (job.jackpot ? '<div class="badge">\u2605 Stórsamningur</div>' : "") +
+        ico(JOB_ICON, job.type || job.id, "\ud83d\udd27") +
         '<div class="job-name">' + L.esc(job.name) + "</div>" +
         '<div class="job-pay">' + L.formatKr(job.pay) + "</div>" +
         '<div class="job-meta">' + job.seconds + " sek. " + L.esc(job.blurb) + "</div>" +
@@ -249,7 +339,7 @@
     }).join("");
     if (!cards) cards = '<p class="coach">Engin verk í dag.</p>';
     var locked = L.JOB_TYPES.filter(function (t) { return t.level > level; }).map(function (t) {
-      return '<div class="jobcard locked"><div class="job-name">' + L.esc(t.name) + "</div>" +
+      return '<div class="jobcard locked">' + ico(JOB_ICON, t.id, "\ud83d\udd12") + '<div class="job-name">\ud83d\udd12 ' + L.esc(t.name) + "</div>" +
         '<div class="job-meta">Opnast á þrepi ' + t.level + "</div></div>";
     }).join("");
     return '<div class="view"><div class="jobs">' + cards + locked + "</div></div>";
@@ -283,7 +373,7 @@
           (S.house ? "Færa " : "Kaupa ") + L.formatKr(quote.cost) + "</button>";
         if (quote.refund) action += '<div class="fine">Gamla húsið gefur ' + L.formatKr(quote.refund) + "</div>";
       }
-      return '<div class="hcard"><div><b>' + L.esc(h.name) + "</b><div>" + L.esc(h.blurb) + "</div></div>" + action + "</div>";
+      return '<div class="hcard">' + ico(HOUSE_ICON, h.id, "\ud83c\udfe0") + '<div class="hbody"><b>' + L.esc(h.name) + "</b><div>" + L.esc(h.blurb) + "</div></div>" + action + "</div>";
     }).join("");
     var ups = L.UPGRADES.map(function (u) {
       var owned = S.upgrades.indexOf(u.id) >= 0;
@@ -332,6 +422,7 @@
       return '<div class="ach' + (on ? " on" : "") + '"><b>' + L.esc(a.name) + "</b><span>" + L.esc(a.desc) + "</span></div>";
     }).join("");
     return '<div class="view more-view">' +
+      '<button type="button" class="btn-board" data-act="board">\ud83c\udfc6 Stigatafla</button>' +
       '<div class="scorebox"><div class="score">' + L.formatNum(L.score(S)) + '</div><div>Stig. Besta ' + L.formatNum(Meta.best || 0) + "</div>" +
       '<div class="fine">Nettó ' + L.formatKr(L.netWorth(S)) + "</div></div>" +
       '<div class="rank"><b>' + L.esc(lv.current.title) + "</b><div>" + L.esc(xpLine) + "</div>" +
@@ -354,6 +445,7 @@
       "<h2>Afrek</h2><div class=\"achs\">" + ach + "</div>" +
       '<div class="footer-actions">' +
       '<button type="button" data-act="sound">' + (Meta.sound ? "Hljóð: kveikt" : "Hljóð: slökkt") + "</button>" +
+      '<button type="button" data-act="rename">Breyta nafni: ' + L.esc(C ? C.name() : "") + "</button>" +
       '<button type="button" data-act="new">Nýr leikur</button>' +
       '<p class="fine">Vistast hér í tækinu.</p></div></div>';
   }
@@ -379,12 +471,12 @@
   function summaryHTML(s) {
     var hero = "";
     if (s.actionCash) {
-      hero = '<div class="hero ' + (s.actionCash > 0 ? "good" : "bad") + '">' + L.formatKrSigned(s.actionCash) + '</div><div class="hero-sub">Gróði</div>';
+      hero = '<div class="hero ' + (s.actionCash > 0 ? "good" : "bad") + '" data-count="' + s.actionCash + '" data-mode="krs">' + L.formatKrSigned(s.actionCash) + '</div><div class="hero-sub">Gróði</div>';
     } else if (s.eventText) hero = '<div class="hero neutral">' + L.esc(s.eventText) + "</div>";
     else hero = '<div class="hero neutral">Nýr dagur</div>';
-    var xp = s.actionXp ? '<div class="hero-sub">+' + s.actionXp + " reynsla</div>" : "";
+    var xp = s.actionXp ? '<div class="hero-sub xpgain" data-count="' + s.actionXp + '" data-mode="xp">+' + s.actionXp + " reynsla</div>" : "";
     var bits = "";
-    if (s.levelUp) bits += '<div class="banner">Nýtt þrep: ' + L.esc(s.levelUp.title) + "</div>";
+    if (s.levelUp) bits += '<div class="levelup"><div class="lu-star">\u26a1</div><div class="lu-k">NÝTT ÞREP</div><div class="lu-n">' + s.levelUp.level + '</div><div class="lu-t">' + L.esc(s.levelUp.title) + "</div></div>";
     if (s.firmNew) bits += '<div class="banner">Firma: ' + L.esc(s.firmNew) + "</div>";
     (s.unlocked || []).forEach(function (u) {
       bits += '<div class="banner">Nýtt: ' + L.esc(u.name) + "</div>";
@@ -424,7 +516,11 @@
     ov.innerHTML = summaryHTML(summary);
     var go = ov.querySelector("[data-act='go-on']");
     if (go) go.focus();
+    countUps(ov);
+    if (summary.levelUp) burst(ov.querySelector(".sheet"));
+    else if (summary.reward && summary.reward.perfect) burst(ov.querySelector(".sheet"));
     reactMorning(summary);
+    cloudSync(true);
   }
 
   function reactMorning(summary) {
@@ -482,6 +578,63 @@
     ov.innerHTML = '<div class="sheet"><p class="ask">' + L.esc(question) + "</p>" +
       '<button type="button" class="btn-go" data-act="mat-yes">Nota</button>' +
       '<button type="button" data-act="mat-no">Halda</button></div>';
+  }
+
+  function showNamePrompt(rename) {
+    ui.lock = true;
+    var ov = document.getElementById("overlay");
+    ov.hidden = false;
+    ov.className = "sheetmode";
+    ov.innerHTML = '<div class="sheet namebox"><div class="kicker">' + (rename ? "Breyta nafni" : "Velkominn") + '</div>' +
+      '<p class="ask">Hvað heitir þú?</p>' +
+      '<input id="pname" type="text" maxlength="16" autocomplete="nickname" autocapitalize="words" enterkeyhint="go" placeholder="Nafn" value="' + L.esc(rename && C ? C.name() : "") + '">' +
+      '<button type="button" class="btn-go" data-act="name-ok" data-id="' + (rename ? "r" : "n") + '">' + (rename ? "Vista" : "Byrja") + "</button></div>";
+    var inp = document.getElementById("pname");
+    if (inp) {
+      inp.addEventListener("keydown", function (e) {
+        if (e.key === "Enter") { e.preventDefault(); submitName(rename); }
+      });
+      setTimeout(function () { inp.focus(); inp.select(); }, 60);
+    }
+  }
+
+  function submitName(rename) {
+    var inp = document.getElementById("pname");
+    if (C) C.setName(inp ? inp.value : "");
+    hideOverlay();
+    render();
+    if (!rename && Meta.login && Meta.login.pending) showBonus();
+    cloudSync(true);
+  }
+
+  function showBoard() {
+    ui.lock = true;
+    var ov = document.getElementById("overlay");
+    ov.hidden = false;
+    ov.className = "sheetmode";
+    ov.innerHTML = '<div class="sheet board"><div class="kicker">\ud83c\udfc6 Stigatafla</div>' +
+      '<div class="rows" id="boardrows"><p class="fine">Hleð...</p></div>' +
+      '<button type="button" class="btn-go" data-act="go-on">Loka</button></div>';
+    cloudSync(true);
+    if (!C) return;
+    setTimeout(function () {
+      C.top(function (rows) {
+        var box = document.getElementById("boardrows");
+        if (!box) return;
+        if (!rows) { box.innerHTML = '<p class="fine">Ekkert samband. Reyndu aftur síðar.</p>'; return; }
+        if (!rows.length) { box.innerHTML = '<p class="fine">Enginn á töflunni enn.</p>'; return; }
+        var me = C.id();
+        var html = '<div class="brow bhead"><span>#</span><span>Nafn</span><span>Þrep</span><span>Eignir</span></div>';
+        rows.forEach(function (r, i) {
+          var medal = i === 0 ? "\ud83e\udd47" : (i === 1 ? "\ud83e\udd48" : (i === 2 ? "\ud83e\udd49" : String(i + 1)));
+          html += '<div class="brow' + (r.player_id === me ? " me" : "") + (i < 3 ? " top3" : "") + '"><span class="rk">' + medal + '</span>' +
+            '<span class="nm"><b>' + L.esc(r.name) + "</b><em>" + L.esc(r.title) + "</em></span>" +
+            '<span class="lv">' + L.esc(String(r.level)) + "</span>" +
+            '<span class="nw">' + L.formatNum(Number(r.net_worth) || 0) + "</span></div>";
+        });
+        box.innerHTML = html;
+      });
+    }, 0);
   }
 
   function findJob(uid) {
@@ -543,6 +696,7 @@
     toast(msg, res.profit >= 0 ? "good" : "bad");
     if (sfx()) sfx().coin();
     celebrate(res);
+    cloudSync(false);
   }
 
   function doHouse(id) {
@@ -557,6 +711,7 @@
     toast(res.name, "gold");
     if (sfx()) sfx().level();
     celebrate(res);
+    cloudSync(false);
   }
 
   function doUpgrade(id) {
@@ -571,6 +726,7 @@
     toast(res.name, "gold");
     if (sfx()) sfx().win();
     celebrate(res);
+    cloudSync(false);
   }
 
   function doMoney(kind, id) {
@@ -621,6 +777,7 @@
     hideOverlay();
     render();
     toast("Nýr leikur", "good");
+    cloudSync(true);
   }
 
   function takeBonus() {
@@ -644,6 +801,7 @@
     var act = b.getAttribute("data-act");
     var id = b.getAttribute("data-id");
     if (act === "go-on") { hideOverlay(); render(); return; }
+    if (act === "name-ok") { submitName(id === "r"); return; }
     if (act === "bonus-take") { takeBonus(); return; }
     if (act === "bonus-later") { hideOverlay(); toast("Umbun bíður", "good"); return; }
     if (act === "bonus-open") { showBonus(); return; }
@@ -678,6 +836,8 @@
     if (act === "house") { doHouse(id); return; }
     if (act === "upgrade") { doUpgrade(id); return; }
     if (act === "debt" || act === "in" || act === "out") { doMoney(act, id); return; }
+    if (act === "board") { showBoard(); return; }
+    if (act === "rename") { showNamePrompt(true); return; }
     if (act === "new") { showConfirm(); }
   }
 
@@ -691,7 +851,11 @@
     saveMeta();
     commit();
     render();
-    if (Meta.login && Meta.login.pending) showBonus();
+    if (C && !C.hasName()) showNamePrompt(false);
+    else {
+      if (Meta.login && Meta.login.pending) showBonus();
+      cloudSync(false);
+    }
     document.addEventListener("pointerdown", function (e) {
       gesture.x = e.clientX;
       gesture.y = e.clientY;
