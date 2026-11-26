@@ -136,7 +136,8 @@
       { k: "xp", w: 8 },
       { k: "spin", w: 6 },
       { k: "freeze", w: freezeOk ? 1.5 : 0 },
-      { k: "jackpot", w: 0.4 + q * 0.35 }
+      { k: "jackpot", w: 0.4 + q * 0.35 },
+      { k: "voucher", w: opts.S && L.vehicleOf(opts.S).tier < 5 ? 1.2 + q * 0.4 : 0 }
     ];
     var it = wpick(rng, items).k;
     if (it === "small") return { kind: "coins", tier: "small", amount: Math.round(u * (0.6 + rng()) / 100) * 100, icon: "\ud83d\udcb0", label: "Smáaurar" };
@@ -146,6 +147,7 @@
     if (it === "xp") return { kind: "xp", tier: "mid", amount: 15 + level * 5 + q * 10, icon: "\u2b50", label: "Reynsla" };
     if (it === "spin") return { kind: "spin", tier: "mid", amount: 1, icon: "\ud83c\udfa1", label: "Frítt hjól" };
     if (it === "freeze") return { kind: "freeze", tier: "epic", amount: 1, icon: "\u2744\ufe0f", label: "Frystir fyrir röðina" };
+    if (it === "voucher") return { kind: "voucher", tier: "epic", amount: 1, icon: "\ud83c\udf9f\ufe0f", label: "Bílamiði" };
     return rollToolReward(rng, owned, q);
   }
 
@@ -195,6 +197,8 @@
     } else if (rw.kind === "spin") {
       S.spins = (S.spins || 0) + 1;
       meta.pity = (meta.pity || 0) + 1;
+    } else if (rw.kind === "voucher") {
+      S.voucher = (S.voucher || 0) + 1;
     } else if (rw.kind === "freeze") {
       if (!meta.login) meta.login = { last: null, streak: 0, forgive: false, claimedDate: null, pending: null };
       meta.login.freezes = (meta.login.freezes || 0) + 1;
@@ -220,12 +224,13 @@
     else if (kind === "job") { g.need = 1; g.label = "Kláraðu verk"; g.icon = "\ud83d\udd27"; g.cash = u * 1.2; }
     else if (kind === "fast") { g.need = 1; g.limit = 14; g.label = "Verk á undir 14 sek."; g.icon = "\u26a1"; g.cash = u * 2.2; }
     else if (kind === "perfect") { g.need = 1; g.label = "Fullkomið verk"; g.icon = "\ud83c\udfaf"; g.cash = u * 2.0; }
+    else if (kind === "space") { g.need = 1; g.label = "Keyptu meira pláss"; g.icon = "\ud83d\ude90"; g.cash = u * 3; }
     else if (kind === "travel") { g.need = 1; g.label = "Farðu í annan bæ"; g.icon = "\ud83d\ude90"; g.cash = u * 1.0; }
     g.cash = Math.round(g.cash / 100) * 100;
     return g;
   }
 
-  var KINDS = ["sell", "buy", "profit", "job", "fast", "perfect", "travel"];
+  var KINDS = ["sell", "buy", "profit", "job", "fast", "perfect", "travel", "space"];
 
   function fillGoals(S, rng) {
     if (!S.micro) S.micro = [];
@@ -234,6 +239,8 @@
       var used = S.micro.map(function (g) { return g.k; });
       var pool = KINDS.filter(function (k) { return used.indexOf(k) < 0; });
       if (!S.stats || !S.stats.jobs) pool = pool.filter(function (k) { return k !== "fast" && k !== "perfect"; });
+      var ns = L.nextSpace(S);
+      if (!ns || ns.locked || S.cash < ns.cost * 0.35 || S.cash > ns.cost * 3) pool = pool.filter(function (k) { return k !== "space"; });
       if (!pool.length) pool = KINDS;
       var kind = pool[Math.floor(rng() * pool.length)];
       S.micro.push(makeGoal(S, kind, rng));

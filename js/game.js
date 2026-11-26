@@ -255,7 +255,7 @@
       ledHTML("cash", "g", "PENINGAR", S.cash) +
       ledHTML("bank", "g", "BANKI", S.bank) +
       ledHTML("debt", "r", "SKULD", S.debt) +
-      '<div class="led y' + hot + '"><span>BÍLL</span><b>' + used + "/" + cap + "</b></div>" +
+      '<div class="led y tap' + hot + '" data-act="garage"><span>' + L.esc(L.vehicleOf(S).short.toUpperCase()) + '</span><b>' + L.vehicleOf(S).icon + " " + used + "/" + cap + "</b></div>" +
       "</div>" +
       '<button type="button" class="league" id="leaguechip" data-act="board">' + leagueChipHTML() + "</button>" +
       microHTML() +
@@ -333,7 +333,7 @@
     }
     return '<div class="view view-markadur">' +
       '<div class="cities">' + cities + "</div>" +
-      '<div class="goods-col"><div class="toolbar">' + goalHTML() +
+      '<div class="goods-col"><div class="toolbar">' + goalHTML() + spaceTeaserHTML() +
       '<div class="qty"><span>Magn</span>' + qtys + "</div>" +
       bonus +
       (line ? '<div class="coach">' + L.esc(line) + "</div>" : "") +
@@ -409,7 +409,7 @@
       var afford = S.cash >= u.price;
       return '<div class="hcard">' + body + '<button type="button" class="' + (afford ? "" : "dim") + '" data-act="upgrade" data-id="' + u.id + '">Kaupa ' + L.formatKr(u.price) + "</button></div>";
     }).join("");
-    return '<div class="view house-view">' + houseVisual() +
+    return '<div class="view house-view">' + spaceTeaserHTML() + houseVisual() +
       '<p class="daily">' + (daily ? ("Á dag: " + L.formatKr(daily)) : "Engin dagleg inneign enn.") + "</p>" +
       '<h2>Hús</h2><div class="stack">' + houses + "</div>" +
       '<h2>Uppfærslur</h2><div class="stack">' + ups + "</div></div>";
@@ -441,6 +441,7 @@
     return '<div class="view more-view">' +
       '<div class="bigbtns"><button type="button" class="btn-board" data-act="board">\ud83c\udfc6<span>Deild</span></button>' +
       '<button type="button" class="btn-tools" data-act="tools-open">\ud83e\uddf0<span>Verkfæri ' + F.TOOLS.filter(function (t) { return Meta.tools[t.id]; }).length + "/" + F.TOOLS.length + "</span></button>" +
+      '<button type="button" class="btn-car" data-act="garage">' + L.vehicleOf(S).icon + '<span>Bílasala</span></button>' +
       '<button type="button" class="btn-wheel2' + ((S.spins || 0) > 0 ? " pulse" : "") + '" data-act="wheel-open">\ud83c\udfa1<span>Hjól ' + (S.spins || 0) + "</span></button></div>" +
       '<div class="streakbox"><div class="kicker">\ud83d\udd25 Röð: ' + ((Meta.login && Meta.login.streak) || 0) + ' dagar' + (Meta.login && Meta.login.freezes ? " \u2744\ufe0f x" + Meta.login.freezes : "") + "</div>" +
       calendarHTML((Meta.login && Meta.login.streak) || 1, !!(Meta.login && Meta.login.claimedDate === L.dateStr(new Date()))) + "</div>" +
@@ -642,6 +643,9 @@
   function ensureExtras(s) {
     if (typeof s.spins !== "number") s.spins = 0;
     if (typeof s.jobsSinceSpin !== "number") s.jobsSinceSpin = 0;
+    if (!s.vehicle) s.vehicle = "smabill";
+    if (typeof s.storage !== "number") s.storage = 0;
+    if (typeof s.voucher !== "number") s.voucher = 0;
     F.crewInit(s, Date.now());
     if (!s.micro || !s.micro.length) {
       if (!s.stats || !s.stats.jobs) F.firstGoals(s, Math.random);
@@ -713,6 +717,125 @@
     if (sfx()) sfx().win();
   }
 
+  /* ---------- garage: vehicles and storage ---------- */
+  function spaceTeaserHTML() {
+    var sp = L.nextSpace(S);
+    if (!sp) return "";
+    var pct = Math.max(4, Math.min(100, Math.round(Math.min(S.cash, sp.cost) / sp.cost * 100)));
+    var ready = !sp.locked && S.cash >= sp.cost;
+    var line = sp.locked ? "Opnast á þrepi " + sp.lvl : (ready ? "Tilbúið! Tappaðu" : "vantar " + L.formatKr(sp.cost - S.cash));
+    return '<button type="button" class="teaser' + (ready ? " ready" : "") + '" data-act="garage"><span class="ico">' + sp.icon + "</span>" +
+      '<span class="tz-b"><b>' + L.esc(sp.name) + " <em>+" + sp.extra + ' pláss</em></b><span class="mbar"><span style="width:' + pct + '%"></span></span>' +
+      '<small>' + line + "</small></span></button>";
+  }
+
+  function perkChips(v) {
+    var c = [];
+    if (v.theft < 1) c.push("\ud83d\udee1\ufe0f -" + Math.round((1 - v.theft) * 100) + "% þjófnaður");
+    if (v.brk < 1) c.push("\ud83d\udd27 -" + Math.round((1 - v.brk) * 100) + "% bilanir");
+    if (v.pay) c.push("\ud83d\udcb0 +" + Math.round(v.pay * 100) + "% laun");
+    return c.map(function (x) { return "<i>" + x + "</i>"; }).join("");
+  }
+
+  function garageHTML() {
+    var cur = L.vehicleOf(S);
+    var used = L.usedSpace(S);
+    var cap = L.capacity(S);
+    var pct = cap ? Math.min(100, Math.round(used / cap * 100)) : 0;
+    var h = '<div class="sheet garage"><div class="kicker">\ud83d\ude90 Bílasala</div>' +
+      '<div class="g-cur"><div class="g-ico">' + cur.icon + '</div><div class="g-t"><b>' + L.esc(cur.name) + '</b><div class="gbar"><span style="width:' + pct + '%"></span></div>' +
+      '<div class="fine">' + used + "/" + cap + " pláss. Innskipti " + L.formatKr(cur.resale) + "</div></div></div>";
+    if (S.voucher > 0) h += '<div class="vouch">\ud83c\udf9f\ufe0f Bílamiði x' + S.voucher + ": -25% á næsta bíl</div>";
+    h += '<div class="vlist">';
+    L.VEHICLES.forEach(function (v) {
+      if (v.id === cur.id) {
+        h += '<div class="vcard cur"><span class="vi">' + v.icon + '</span><div class="vb"><b>' + L.esc(v.name) + '</b><div class="chips"><i>' + v.cap + " pláss</i>" + perkChips(v) + '</div></div><div class="mine">Núna</div></div>';
+        return;
+      }
+      if (v.tier < cur.tier) {
+        h += '<div class="vcard old"><span class="vi">' + v.icon + '</span><div class="vb"><b>' + L.esc(v.name) + '</b></div><div class="fine">Eldra</div></div>';
+        return;
+      }
+      var q = L.vehicleCost(S, v);
+      var next = v.tier === cur.tier + 1;
+      var act;
+      if (!q.lvlOk) act = '<div class="fine">\ud83d\udd12 Þrep ' + v.lvl + "</div>";
+      else {
+        var ok = S.cash >= q.cost;
+        act = '<button type="button" class="' + (ok ? "good pulse" : "dim") + '" data-act="veh-buy" data-id="' + v.id + '">Kaupa ' + L.formatNum(q.cost) + " kr</button>";
+        if (!ok) act += '<div class="mbar"><span style="width:' + Math.max(3, Math.round(S.cash / q.cost * 100)) + '%"></span></div><div class="fine">vantar ' + L.formatKr(q.cost - S.cash) + "</div>";
+      }
+      h += '<div class="vcard' + (v.legend ? " legend" : "") + (next ? " next" : "") + '"><span class="vi">' + v.icon + '</span><div class="vb"><b>' + L.esc(v.name) + '</b><div class="chips"><i>' + v.cap + " pláss</i>" + perkChips(v) + '</div></div><div class="va">' + act + "</div></div>";
+    });
+    h += "</div><h2>Geymsla</h2><div class=\"vlist\">";
+    var lvl = L.storageLvl(S);
+    L.STORAGES.forEach(function (st) {
+      if (st.lvl <= lvl) {
+        h += '<div class="vcard cur"><span class="vi">' + st.icon + '</span><div class="vb"><b>' + L.esc(st.name) + '</b><div class="chips"><i>+' + st.cap + ' pláss</i></div></div><div class="mine">\u2705</div></div>';
+      } else if (st.lvl === lvl + 1) {
+        var lock = L.levelOf(S.xp).current.level < st.need;
+        var okc = S.cash >= st.price;
+        var act2 = lock ? '<div class="fine">\ud83d\udd12 Þrep ' + st.need + "</div>" :
+          '<button type="button" class="' + (okc ? "good pulse" : "dim") + '" data-act="store-buy">Kaupa ' + L.formatNum(st.price) + " kr</button>" +
+          (okc ? "" : '<div class="mbar"><span style="width:' + Math.max(3, Math.round(S.cash / st.price * 100)) + '%"></span></div><div class="fine">vantar ' + L.formatKr(st.price - S.cash) + "</div>");
+        h += '<div class="vcard next"><span class="vi">' + st.icon + '</span><div class="vb"><b>' + L.esc(st.name) + '</b><div class="chips"><i>+' + st.cap + ' pláss</i></div></div><div class="va">' + act2 + "</div></div>";
+      } else {
+        h += '<div class="vcard old"><span class="vi">' + st.icon + '</span><div class="vb"><b>' + L.esc(st.name) + '</b><div class="chips"><i>+' + st.cap + ' pláss</i></div></div><div class="fine">\ud83d\udd12 Þrep ' + st.need + "</div></div>";
+      }
+    });
+    return h + '</div><button type="button" class="btn-go" data-act="go-on">Loka</button></div>';
+  }
+
+  function showGarage(celebrate) {
+    if (ui.lock && !document.querySelector(".sheet.garage")) return;
+    ui.lock = true;
+    var ov = document.getElementById("overlay");
+    var keep = document.querySelector(".sheet.garage");
+    var y = keep ? keep.scrollTop : 0;
+    ov.hidden = false;
+    ov.className = "sheetmode";
+    ov.innerHTML = garageHTML();
+    var sh = ov.querySelector(".sheet");
+    if (sh && keep) sh.scrollTop = y;
+    if (celebrate && sh) {
+      burst(sh);
+      var gi = sh.querySelector(".g-ico");
+      if (gi) gi.classList.add("zoom");
+    }
+  }
+
+  function afterSpaceBuy(res, msg) {
+    commit();
+    celebrate(res);
+    microDone(F.microEvent(S, "space", 1, null, Math.random));
+    render({ keepScroll: true, pop: true });
+    toast(msg, "gold");
+    if (sfx()) sfx().level();
+    showGarage(true);
+    cloudSync(true);
+  }
+
+  function doVehicle(id) {
+    var res = L.buyVehicle(S, id);
+    if (!res.ok) {
+      toast(res.reason === "cash" ? "Vantar fé" : (res.reason === "lvl" ? "Þarf hærra þrep" : "Ekki hægt"), "bad");
+      if (sfx()) sfx().bad();
+      return;
+    }
+    var gain = res.vehicle.cap;
+    afterSpaceBuy(res, res.vehicle.icon + " " + res.name + "! " + gain + " pláss");
+  }
+
+  function doStorage() {
+    var res = L.buyStorage(S);
+    if (!res.ok) {
+      toast(res.reason === "cash" ? "Vantar fé" : (res.reason === "lvl" ? "Þarf hærra þrep" : "Ekki hægt"), "bad");
+      if (sfx()) sfx().bad();
+      return;
+    }
+    afterSpaceBuy(res, res.storage.icon + " " + res.name + "! +" + res.storage.cap + " pláss");
+  }
+
   /* ---------- crates ---------- */
   function crateHTML(q) {
     var Q = F.QUALITY[q];
@@ -740,6 +863,8 @@
       body = '<div class="rw-i">' + rw.icon + '</div><div class="rw-n">' + L.esc(rw.label) + '</div><div class="rw-a" data-count="' + rw.amount + '" data-mode="krs">+' + L.formatNum(rw.amount) + " kr</div>";
     } else if (rw.kind === "xp") {
       body = '<div class="rw-i">' + rw.icon + '</div><div class="rw-n">Reynsla</div><div class="rw-a xp" data-count="' + rw.amount + '" data-mode="xp">+' + rw.amount + " reynsla</div>";
+    } else if (rw.kind === "voucher") {
+      body = '<div class="rw-i">' + rw.icon + '</div><div class="rw-n">Bílamiði!</div><div class="rw-b">-25% á næsta bíl</div>';
     } else if (rw.kind === "spin") {
       body = '<div class="rw-i">' + rw.icon + '</div><div class="rw-n">Frítt hjól!</div><div class="rw-b">Snúðu því strax</div>';
     } else {
@@ -767,7 +892,9 @@
     clearTimeout(c.t1);
     clearTimeout(c.t2);
     var lv = L.levelOf(S.xp).current.level;
-    var rw = F.rollCrate(c.q, lv, Meta, Math.random, c.opts);
+    var ro = { S: S };
+    for (var ok in c.opts) if (Object.prototype.hasOwnProperty.call(c.opts, ok)) ro[ok] = c.opts[ok];
+    var rw = F.rollCrate(c.q, lv, Meta, Math.random, ro);
     var extra = F.applyReward(S, Meta, rw, Math.random);
     Meta.crates = (Meta.crates || 0) + 1;
     var host = c.host;
@@ -1454,6 +1581,8 @@
       return;
     }
     if (act === "callout") { acceptCallout(); return; }
+    if (act === "veh-buy") { doVehicle(id); return; }
+    if (act === "store-buy") { doStorage(); return; }
     if (act === "wheel-open") { if (ui.crate && !ui.crate.done) resolveCrate(); if (!ui.spinning) showWheel(); return; }
     if (act === "wheel-spin") { spinWheel(); return; }
     if (act === "tools-open") { showTools(); return; }
@@ -1480,6 +1609,7 @@
       return;
     }
     if (ui.lock) return;
+    if (act === "goal" && id === "garage") { showGarage(false); return; }
     if (act === "tab" || act === "goal") {
       ui.tab = id || "markadur";
       render();
@@ -1502,6 +1632,7 @@
     if (act === "upgrade") { doUpgrade(id); return; }
     if (act === "debt" || act === "in" || act === "out") { doMoney(act, id); return; }
     if (act === "board") { showBoard(); return; }
+    if (act === "garage") { showGarage(false); return; }
     if (act === "collect") { collectCrew(); return; }
     if (act === "hire") {
       var hr = F.crewHire(S, id, Date.now());

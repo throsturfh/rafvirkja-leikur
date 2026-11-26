@@ -74,6 +74,22 @@
     { id: "solar", name: "Sólarþak", price: 130000, need: 3, rep: 4, daily: 12000, cap: 0, pay: 0, blurb: "Orkan borgar sér." }
   ];
 
+  var VEHICLES = [
+    { id: "smabill", tier: 0, name: "Ryðgaður smábíll", short: "Smábíll", icon: "\ud83d\ude97", cap: 36, price: 0, resale: 5000, lvl: 1, theft: 1, brk: 1, pay: 0, nom: "Smábíllinn", dat: "smábílnum", blurb: "Ryðgar og drynur." },
+    { id: "caddy", tier: 1, name: "Notaður Caddy", short: "Caddy", icon: "\ud83d\ude99", cap: 58, price: 60000, resale: 30000, lvl: 1, theft: 0.8, brk: 0.8, pay: 0, nom: "Caddyinn", dat: "Caddynum", blurb: "Traustur og lyktar af kaffi." },
+    { id: "sendibill", tier: 2, name: "Sendibíll", short: "Sendibíll", icon: "\ud83d\ude90", cap: 92, price: 150000, resale: 75000, lvl: 3, theft: 0.6, brk: 0.65, pay: 0.02, nom: "Sendibíllinn", dat: "sendibílnum", blurb: "Hurðir að aftan. Nóg pláss." },
+    { id: "sprinter", tier: 3, name: "Stór sendibíll", short: "Sprinter", icon: "\ud83d\ude9a", cap: 140, price: 380000, resale: 190000, lvl: 4, theft: 0.45, brk: 0.5, pay: 0.04, nom: "Sprinterinn", dat: "Sprinternum", blurb: "Hár og breiður. Lager á hjólum." },
+    { id: "vorubill", tier: 4, name: "Vörubíll með kassa", short: "Vörubíll", icon: "\ud83d\ude9b", cap: 220, price: 950000, resale: 475000, lvl: 6, theft: 0.3, brk: 0.35, pay: 0.06, nom: "Vörubíllinn", dat: "vörubílnum", blurb: "Heill kassi af efni." },
+    { id: "rafbill", tier: 5, name: "Rafmagns vinnutrukkur", short: "Rafmagnstrukkur", icon: "\u26a1", cap: 340, price: 2600000, resale: 1300000, lvl: 8, theft: 0.15, brk: 0.15, pay: 0.12, nom: "Rafmagnstrukkurinn", dat: "rafmagnstrukknum", blurb: "Goðsagnakenndur. Hljóðlaus og risastór.", legend: true }
+  ];
+
+  var STORAGES = [
+    { lvl: 1, name: "Bílskúrshorn", icon: "\ud83d\udce6", cap: 12, price: 30000, need: 1 },
+    { lvl: 2, name: "Geymslugámur", icon: "\ud83d\uddc3\ufe0f", cap: 30, price: 110000, need: 3 },
+    { lvl: 3, name: "Lagerhúsnæði", icon: "\ud83c\udfed", cap: 70, price: 380000, need: 5 },
+    { lvl: 4, name: "Heildsölulager", icon: "\ud83c\udfec", cap: 150, price: 1200000, need: 7 }
+  ];
+
   var FIRMS = [
     "Straumur ehf.",
     "Glóð og félagar",
@@ -233,8 +249,82 @@
     return h ? h.tier : 0;
   }
 
+  function vehicleOf(state) {
+    for (var i = 0; i < VEHICLES.length; i++) if (VEHICLES[i].id === state.vehicle) return VEHICLES[i];
+    return VEHICLES[0];
+  }
+
+  function storageLvl(state) { return Math.max(0, Math.min(STORAGES.length, state.storage || 0)); }
+
+  function storageCap(state) {
+    var n = 0;
+    for (var i = 0; i < storageLvl(state); i++) n += STORAGES[i].cap;
+    return n;
+  }
+
+  function levelNow(state) { return levelOf(state.xp).current.level; }
+
+  function vehicleCost(state, v) {
+    var cur = vehicleOf(state);
+    if (!v || v.tier <= cur.tier) return null;
+    var base = v.price - cur.resale;
+    var off = state.voucher > 0 ? Math.round(base * 0.25 / 100) * 100 : 0;
+    return { cost: base - off, refund: cur.resale, off: off, lvlOk: levelNow(state) >= v.lvl };
+  }
+
+  function buyVehicle(state, id) {
+    var v = null;
+    for (var i = 0; i < VEHICLES.length; i++) if (VEHICLES[i].id === id) v = VEHICLES[i];
+    var q = vehicleCost(state, v);
+    if (!q) return { ok: false, reason: "old" };
+    if (!q.lvlOk) return { ok: false, reason: "lvl" };
+    if (state.cash < q.cost) return { ok: false, reason: "cash" };
+    state.cash -= q.cost;
+    if (q.off) state.voucher -= 1;
+    state.vehicle = v.id;
+    return { ok: true, name: v.name, vehicle: v, gained: earnAchievement(state) };
+  }
+
+  function nextStorage(state) {
+    var n = storageLvl(state);
+    return n < STORAGES.length ? STORAGES[n] : null;
+  }
+
+  function buyStorage(state) {
+    var st = nextStorage(state);
+    if (!st) return { ok: false, reason: "max" };
+    if (levelNow(state) < st.need) return { ok: false, reason: "lvl" };
+    if (state.cash < st.price) return { ok: false, reason: "cash" };
+    state.cash -= st.price;
+    state.storage = st.lvl;
+    return { ok: true, name: st.name, storage: st, gained: earnAchievement(state) };
+  }
+
+  function nextSpace(state) {
+    var list = [];
+    var cur = vehicleOf(state);
+    for (var i = 0; i < VEHICLES.length; i++) {
+      if (VEHICLES[i].tier === cur.tier + 1) {
+        var q = vehicleCost(state, VEHICLES[i]);
+        list.push({ kind: "vehicle", id: VEHICLES[i].id, name: VEHICLES[i].name, icon: VEHICLES[i].icon, cost: q.cost, lvl: VEHICLES[i].lvl, extra: VEHICLES[i].cap - cur.cap });
+      }
+    }
+    var st = nextStorage(state);
+    if (st) list.push({ kind: "storage", id: "storage", name: st.name, icon: st.icon, cost: st.price, lvl: st.need, extra: st.cap });
+    if (!list.length) return null;
+    var lv = levelNow(state);
+    var vs = list.filter(function (x) { return x.kind === "vehicle"; });
+    var pool = vs.filter(function (x) { return x.lvl <= lv; });
+    if (!pool.length) pool = list.filter(function (x) { return x.lvl <= lv; });
+    if (!pool.length) pool = list;
+    pool.sort(function (a, b) { return a.cost - b.cost; });
+    var r = pool[0];
+    r.locked = r.lvl > lv;
+    return r;
+  }
+
   function capacity(state) {
-    var c = 36;
+    var c = vehicleOf(state).cap + storageCap(state);
     if (state.house) c += houseById(state.house).cap;
     for (var i = 0; i < state.upgrades.length; i++) c += upgradeById(state.upgrades[i]).cap || 0;
     if (state.bonus && state.bonus.cap) c += state.bonus.cap;
@@ -260,6 +350,7 @@
     var m = 1;
     for (var i = 0; i < state.upgrades.length; i++) m += upgradeById(state.upgrades[i]).pay || 0;
     if (state.bonus && state.bonus.pay) m += state.bonus.pay;
+    m += vehicleOf(state).pay;
     return m;
   }
 
@@ -281,6 +372,8 @@
     var v = state.cash + state.bank - state.debt + invValue(state);
     if (state.house) v += houseById(state.house).price;
     for (var i = 0; i < state.upgrades.length; i++) v += Math.round(upgradeById(state.upgrades[i]).price * 0.5);
+    v += vehicleOf(state).resale;
+    for (var k = 0; k < storageLvl(state); k++) v += Math.round(STORAGES[k].price * 0.5);
     return v;
   }
 
@@ -404,6 +497,10 @@
   }
 
   var ACHIEVEMENTS = [
+    { id: "car1", name: "Stærri bíll", desc: "Keyptu nýjan bíl.", test: function (s) { return vehicleOf(s).tier >= 1; } },
+    { id: "van", name: "Sendibílstjóri", desc: "Eignastu sendibíl.", test: function (s) { return vehicleOf(s).tier >= 2; } },
+    { id: "truck", name: "Vörubílstjóri", desc: "Eignastu vörubíl.", test: function (s) { return vehicleOf(s).tier >= 4; } },
+    { id: "store1", name: "Eigið lager", desc: "Keyptu geymslu.", test: function (s) { return storageLvl(s) >= 1; } },
     { id: "buy1", name: "Fyrsta kaup", desc: "Keyptu vöru.", test: function (s) { return s.stats.bought >= 1; } },
     { id: "sell1", name: "Fyrsta sala", desc: "Seldu vöru.", test: function (s) { return s.stats.sold >= 1; } },
     { id: "profit1", name: "Fyrsti gróði", desc: "Seldu með hagnaði.", test: function (s) { return s.stats.profitSales >= 1; } },
@@ -1014,6 +1111,9 @@
       loc: "reykjavik",
       inv: {},
       house: null,
+      vehicle: "smabill",
+      storage: 0,
+      voucher: 0,
       upgrades: [],
       achievements: [],
       firm: null,
@@ -1256,7 +1356,7 @@
     }
     if (event.theft) {
       var removed = stealSmall(state);
-      if (!removed) event.text = "Þjófurinn fann ekkert í bílnum.";
+      if (!removed) event.text = "Þjófurinn fann ekkert í " + vehicleOf(state).dat + ".";
     }
     if (event.grant) {
       var gg = good(event.grant.id);
@@ -1289,13 +1389,13 @@
     if (rng() > 0.6) return null;
     var pool = [
       { w: 8, make: function () { return { text: "Vinnueftirlitið sektaði þig.", short: "Sekt", cash: -randInt(rng, 8000, 16000), rep: -6, bad: true }; } },
-      { w: 8, when: function (s) { return usedSpace(s) > 0; }, make: function () { return { text: "Verkfæri hurfu úr bílnum.", short: "Þjófnaður", theft: true, bad: true }; } },
+      { w: 8 * vehicleOf(state).theft, when: function (s) { return usedSpace(s) > 0; }, make: function () { return { text: "Verkfæri hurfu úr " + vehicleOf(state).dat + ".", short: "Þjófnaður", theft: true, bad: true }; } },
       { w: 8, make: function () { return { text: "Útsala. Kaplar á hrakvirði.", short: "Útsala", mul: { ids: ["kapall15", "kapall25", "kapall510"], factor: 0.62 } }; } },
       { w: 8, make: function () { return { text: "LED ljós hækka í verði.", short: "Verðhækkun", mul: { ids: ["led"], factor: 1.7 } }; } },
       { w: 8, make: function () { return { text: "Viðskiptavinur greiddi reikning.", short: "Reikningur", cash: randInt(rng, 4, 8) * 4000 }; } },
       { w: 2, make: function () { return { text: "Happdrætti. Þú vannst.", short: "Happdrætti", cash: randInt(rng, 14, 24) * 5000 }; } },
       { w: 8, make: function () { return { text: "Þú kenndir nema.", short: "Kennsla", xp: 22, rep: 4 }; } },
-      { w: 8, make: function () { return { text: "Bíllinn bilaði.", short: "Viðgerð", cash: -randInt(rng, 6000, 14000), bad: true }; } },
+      { w: 8 * vehicleOf(state).brk, make: function () { return { text: vehicleOf(state).nom + " bilaði.", short: "Viðgerð", cash: -Math.round(randInt(rng, 6000, 14000) * (0.6 + vehicleOf(state).tier * 0.3) / 100) * 100, bad: true }; } },
       { w: 8, make: function () { return { text: "Þú fannst kapalbút.", short: "Fundur", grant: { id: "kapall25", qty: randInt(rng, 1, 3) } }; } },
       { w: 4, make: function () { return { text: "Stórsamningur bíður í verkum.", short: "Samningur", forceJackpot: true }; } },
       { w: 8, make: function () { return { text: "Nágranni gaf þjórfé.", short: "Þjórfé", cash: randInt(rng, 5, 12) * 1000, rep: 1 }; } },
@@ -1483,6 +1583,18 @@
         tab: "hus"
       });
     }
+    var sp = nextSpace(state);
+    if (sp && !sp.locked) {
+      out.push({
+        id: "space",
+        title: sp.name,
+        have: Math.min(state.cash, sp.cost),
+        need: sp.cost,
+        detail: state.cash >= sp.cost ? "tilbúið" : ("vantar " + formatKr(sp.cost - state.cash)),
+        ready: state.cash >= sp.cost,
+        tab: "garage"
+      });
+    }
     var up = nextUpgrade(state);
     if (up) {
       out.push({
@@ -1630,6 +1742,15 @@
     maxAffordable: maxAffordable,
     buy: buy,
     sell: sell,
+    VEHICLES: VEHICLES,
+    STORAGES: STORAGES,
+    vehicleOf: vehicleOf,
+    storageLvl: storageLvl,
+    vehicleCost: vehicleCost,
+    buyVehicle: buyVehicle,
+    buyStorage: buyStorage,
+    nextStorage: nextStorage,
+    nextSpace: nextSpace,
     buyPrice: buyPrice,
     sellPrice: sellPrice,
     grantXp: grantXp,

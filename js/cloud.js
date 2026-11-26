@@ -72,6 +72,7 @@
       house: S.house ? L.houseById(S.house).name : "",
       achievements: S.achievements.length,
       jobs_done: S.stats ? S.stats.jobs : 0,
+      vehicle: L.vehicleOf ? L.vehicleOf(S).name : "",
       week_id: wk.id || "",
       week_score: Math.max(0, Math.round(wk.score || 0)),
       league: F && F.TIERS[wk.tier || 0] ? F.TIERS[wk.tier || 0].id : "Brons",
