@@ -11,9 +11,9 @@
   var RORDER = ["common", "rare", "epic", "legendary"];
 
   var TOOLS = [
-    { id: "skrufjarn", name: "Skrúfjárn", icon: "\ud83d\udd27", r: "common", b: { pay: 0.02 } },
-    { id: "viratong", name: "Víratöng", icon: "\u2702\ufe0f", r: "common", b: { time: 0.04 } },
-    { id: "vasaljos", name: "Vasaljós", icon: "\ud83d\udd26", r: "common", b: { cap: 2 } },
+    { id: "skrufjarn", name: "VDE skrúfjárn", icon: "\ud83d\udd27", r: "common", b: { pay: 0.02 } },
+    { id: "viratong", name: "Afeinangrunartöng", icon: "\u2702\ufe0f", r: "common", b: { time: 0.04 } },
+    { id: "vasaljos", name: "Höfuðljós", icon: "\ud83d\udd26", r: "common", b: { cap: 2 } },
     { id: "malband", name: "Málband", icon: "\ud83d\udccf", r: "common", b: { sell: 0.01 } },
     { id: "penni", name: "Merkipenni", icon: "\u270f\ufe0f", r: "common", b: { buy: 0.01 } },
     { id: "silfurskruf", name: "Silfur skrúfjárn", icon: "\ud83d\udd29", r: "rare", b: { pay: 0.05 } },
@@ -22,12 +22,12 @@
     { id: "borvel", name: "Hleðsluborvél", icon: "\ud83d\udd0b", r: "rare", b: { sell: 0.03 } },
     { id: "gullskruf", name: "Gull skrúfjárn", icon: "\u2699\ufe0f", r: "epic", b: { pay: 0.1 } },
     { id: "leysir", name: "Leysimælir", icon: "\ud83d\udce1", r: "epic", b: { time: 0.14 } },
-    { id: "sendibill", name: "Stór sendibíll", icon: "\ud83d\ude9a", r: "epic", b: { cap: 10 } },
+    { id: "sendibill", name: "Hillur í bílinn", icon: "\ud83d\ude9a", r: "epic", b: { cap: 10 } },
     { id: "verdsja", name: "Verðsjá", icon: "\ud83d\udd2e", r: "epic", b: { buy: 0.05 } },
-    { id: "fjolmaelir", name: "Goðsagnakenndur fjölmælir", icon: "\ud83d\udcdf", r: "legendary", b: { pay: 0.2 } },
+    { id: "fjolmaelir", name: "Gulur Fluke mælir", icon: "\ud83d\udcdf", r: "legendary", b: { pay: 0.2 } },
     { id: "thorshamar", name: "Þórshamar", icon: "\u26a1", r: "legendary", b: { time: 0.25 } },
     { id: "demantstong", name: "Demantstöng", icon: "\ud83d\udc8e", r: "legendary", b: { sell: 0.1, buy: 0.05 } },
-    { id: "gulliviri", name: "Gullni vírinn", icon: "\ud83d\udc51", r: "legendary", b: { cap: 20 } }
+    { id: "gulliviri", name: "Gullni leiðarinn", icon: "\ud83d\udc51", r: "legendary", b: { cap: 20 } }
   ];
   var SETS = {
     common: { pay: 0.04 },
@@ -400,14 +400,15 @@
   var DAY_ICON = ["\ud83d\udcb0", "\ud83d\udcb0", "\ud83d\udce6", "\ud83d\udcb0", "\ud83c\udfa1", "\ud83d\udcb0", "\ud83d\udc51"];
 
   var CALLOUTS = [
-    { t: "Rafmagnslaust á Landspítalanum!", i: "\ud83c\udfe5" },
-    { t: "Sjálfvarinn sló út í Hörpu!", i: "\ud83c\udfb6" },
-    { t: "Myrkur á Laugardalsvelli!", i: "\u26bd" },
-    { t: "Bilun í frystihúsi á Ísafirði!", i: "\ud83d\udc1f" },
-    { t: "Neyðarljósin dóu í Kringlunni!", i: "\ud83d\udecd\ufe0f" },
-    { t: "Hleðslustöð brennur yfir í Keflavík!", i: "\ud83d\udd25" },
-    { t: "Slökkt á umferðarljósunum!", i: "\ud83d\udea6" }
+    { t: "Lekaliðinn slær út í fjölbýli í Breiðholti!", i: "\ud83c\udfe2" },
+    { t: "Heiti potturinn slær út lekaliðann!", i: "\ud83d\udec1" },
+    { t: "Fasi datt út í frystihúsi á Ísafirði!", i: "\ud83d\udc1f" },
+    { t: "Neyðarlýsing virkar ekki í Kringlunni!", i: "\ud83d\udecd\ufe0f" },
+    { t: "Hleðslustöðin sló út í Keflavík!", i: "\ud83d\udd0c" },
+    { t: "Stjórnskápur umferðarljósa bilaður!", i: "\ud83d\udea6" },
+    { t: "Tafla fúin í bílageymslu, brunalykt!", i: "\ud83d\udd25" }
   ];
+
 
   window.RafFun = {
     RARITY: RARITY, RORDER: RORDER, TOOLS: TOOLS, SETS: SETS, QUALITY: QUALITY, WHEEL: WHEEL, CREW: CREW, CAPH: CAPH, CAPCOST: CAPCOST,

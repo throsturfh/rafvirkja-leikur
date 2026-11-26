@@ -6,26 +6,27 @@
   "use strict";
 
   var GOODS = [
-    { id: "innstunga", name: "Innstungur", one: "innstungu", many: "innstungur", base: 900, size: 1 },
-    { id: "rofi", name: "Rofar", one: "rofa", many: "rofa", base: 700, size: 1 },
-    { id: "lekavardi", name: "Lekaliðar", one: "lekaliða", many: "lekaliða", base: 4400, size: 1 },
-    { id: "sjalfvari", name: "Sjálfvarar", one: "sjálfvara", many: "sjálfvara", base: 1900, size: 1 },
-    { id: "tafla", name: "Töflur", one: "töflu", many: "töflur", base: 32000, size: 4 },
-    { id: "kapall15", name: "Kapall 3x1,5", one: "kapal 3x1,5", many: "kapla 3x1,5", base: 3800, size: 2 },
-    { id: "kapall25", name: "Kapall 3x2,5", one: "kapal 3x2,5", many: "kapla 3x2,5", base: 5600, size: 2 },
-    { id: "kapall510", name: "Kapall 5x10", one: "kapal 5x10", many: "kapla 5x10", base: 21000, size: 3 },
-    { id: "ror", name: "Ídráttarrör", one: "ídráttarrör", many: "ídráttarrör", base: 1400, size: 2 },
+    { id: "innstunga", name: "Tenglar", one: "tengil", many: "tengla", base: 1100, size: 1 },
+    { id: "rofi", name: "Rofar", one: "rofa", many: "rofa", base: 900, size: 1 },
+    { id: "lekavardi", name: "Lekaliðar 30 mA", one: "lekaliða", many: "lekaliða", base: 9500, size: 2 },
+    { id: "sjalfvari", name: "Sjálfvör", one: "sjálfvar", many: "sjálfvör", base: 1000, size: 1 },
+    { id: "tafla", name: "Töflukassar", one: "töflukassa", many: "töflukassa", base: 32000, size: 4 },
+    { id: "kapall15", name: "Strengur 3G1,5", one: "streng 3G1,5", many: "strengi 3G1,5", base: 4500, size: 2 },
+    { id: "kapall25", name: "Strengur 3G2,5", one: "streng 3G2,5", many: "strengi 3G2,5", base: 7000, size: 2 },
+    { id: "kapall510", name: "Strengur 5G10", one: "streng 5G10", many: "strengi 5G10", base: 30000, size: 3 },
+    { id: "ror", name: "Ídráttarrör 20 mm", one: "ídráttarrör", many: "ídráttarrör", base: 1400, size: 2 },
     { id: "led", name: "LED ljós", one: "LED ljós", many: "LED ljós", base: 2800, size: 1 },
-    { id: "hledsla", name: "Hleðslustöðvar", one: "hleðslustöð", many: "hleðslustöðvar", base: 89000, size: 6 },
-    { id: "pumpa", name: "Varmadælur", one: "varmadælu", many: "varmadælur", base: 165000, size: 8 },
-    { id: "maelitaki", name: "Mælitæki", one: "mælitæki", many: "mælitæki", base: 22000, size: 2 },
-    { id: "solar", name: "Sólarplötur", one: "sólarplötu", many: "sólarplötur", base: 74000, size: 5 },
-    { id: "snertill", name: "Snertlar", one: "snertil", many: "snertla", base: 7800, size: 1 }
+    { id: "hledsla", name: "Hleðslustöðvar", one: "hleðslustöð", many: "hleðslustöðvar", base: 149000, size: 6 },
+    { id: "pumpa", name: "Varmadælur loft í loft", one: "varmadælu", many: "varmadælur", base: 340000, size: 8 },
+    { id: "maelitaki", name: "Fjölsviðsmælar", one: "fjölsviðsmæli", many: "fjölsviðsmæla", base: 45000, size: 3 },
+    { id: "solar", name: "Sólarsellur 450 W", one: "sólarsellu", many: "sólarsellur", base: 45000, size: 5 },
+    { id: "snertill", name: "Snertlar 25 A", one: "snertil", many: "snertla", base: 7800, size: 1 }
   ];
+
 
   var LOCS = [
     { id: "reykjavik", name: "Reykjavík", here: "í Reykjavík", tip: "Venjulegt verð", all: 1, mods: {}, wild: 0.09 },
-    { id: "hafnarfjordur", name: "Hafnarfjörður", here: "í Hafnarfirði", tip: "Ódýrir kaplar", all: 1, mods: { kapall15: 0.7, kapall25: 0.7, kapall510: 0.74, tafla: 1.22 }, wild: 0.09 },
+    { id: "hafnarfjordur", name: "Hafnarfjörður", here: "í Hafnarfirði", tip: "Ódýrir strengir", all: 1, mods: { kapall15: 0.7, kapall25: 0.7, kapall510: 0.74, tafla: 1.22 }, wild: 0.09 },
     { id: "kopavogur", name: "Kópavogur", here: "í Kópavogi", tip: "Ódýr LED", all: 1, mods: { led: 0.68, innstunga: 0.82, rofi: 0.84, pumpa: 1.28 }, wild: 0.09 },
     { id: "akureyri", name: "Akureyri", here: "á Akureyri", tip: "Ódýrar dælur", all: 1, mods: { pumpa: 0.64, hledsla: 1.3, solar: 1.12 }, wild: 0.1 },
     { id: "selfoss", name: "Selfoss", here: "á Selfossi", tip: "Ódýr rör", all: 1, mods: { ror: 0.66, sjalfvari: 0.78, lekavardi: 0.8 }, wild: 0.09 },
@@ -35,17 +36,18 @@
   ];
 
   var LEVELS = [
-    { level: 1, xp: 0, title: "Rafvirkjanemi" },
-    { level: 2, xp: 40, title: "Nemi" },
+    { level: 1, xp: 0, title: "Grunnnemi" },
+    { level: 2, xp: 40, title: "Nemi á samningi" },
     { level: 3, xp: 100, title: "Sveinn" },
-    { level: 4, xp: 190, title: "Rafvirki" },
-    { level: 5, xp: 310, title: "Meistari" },
-    { level: 6, xp: 470, title: "Verktaki" },
-    { level: 7, xp: 680, title: "Firmaeigandi" },
-    { level: 8, xp: 940, title: "Iðnmeistari" },
-    { level: 9, xp: 1260, title: "Orkumeistari" },
-    { level: 10, xp: 1650, title: "Rafvirkjakóngur" }
+    { level: 4, xp: 190, title: "Reyndur sveinn" },
+    { level: 5, xp: 310, title: "Rafvirkjameistari" },
+    { level: 6, xp: 470, title: "Löggiltur rafverktaki" },
+    { level: 7, xp: 680, title: "Verktaki með menn" },
+    { level: 8, xp: 940, title: "Rafverktakafyrirtæki" },
+    { level: 9, xp: 1260, title: "Stórverktaki" },
+    { level: 10, xp: 1650, title: "Rafmagnskóngur" }
   ];
+
 
   var HOUSES = [
     { id: "kjallari", name: "Kjallaraherbergi", price: 65000, tier: 1, blurb: "Út úr bílnum.", cap: 6, rep: 4 },
@@ -103,18 +105,17 @@
 
   var HOME_CIRCUITS = [
     { id: "ljos", name: "Ljós", a: "10", cable: "1,5" },
-    { id: "inn", name: "Innstungur", a: "16", cable: "2,5" },
-    { id: "eld", name: "Eldhús", a: "20", cable: "2,5" },
-    { id: "ofn", name: "Ofn", a: "20", cable: "2,5" },
+    { id: "inn", name: "Tenglar", a: "16", cable: "2,5" },
     { id: "thvott", name: "Þvottavél", a: "16", cable: "2,5" },
-    { id: "hit", name: "Hitari", a: "25", cable: "4" }
+    { id: "hit", name: "Hitakútur 5 kW", a: "25", cable: "4" },
+    { id: "hlad", name: "Hleðslustöð 7 kW", a: "32", cable: "6" }
   ];
 
   var HOME_OPTIONS = [
-    { id: "10|1,5", label: "10A, 1,5" },
-    { id: "16|2,5", label: "16A, 2,5" },
-    { id: "20|2,5", label: "20A, 2,5" },
-    { id: "25|4", label: "25A, 4" }
+    { id: "10|1,5", label: "10A, 1,5 mm²" },
+    { id: "16|2,5", label: "16A, 2,5 mm²" },
+    { id: "25|4", label: "25A, 4 mm²" },
+    { id: "32|6", label: "32A, 6 mm²" }
   ];
 
   var COLOUR_WIRES = [
@@ -126,12 +127,12 @@
   ];
 
   var MOTORS = [
-    { kw: "4", amps: 8 },
     { kw: "5,5", amps: 11 },
     { kw: "7,5", amps: 15 },
     { kw: "11", amps: 22 },
     { kw: "15", amps: 30 }
   ];
+
 
   var PHASE_SETS = [
     [10, 10, 10, 16, 16, 16],
@@ -145,11 +146,12 @@
 
   var FAULTS = [
     { id: "short", clue: "Sjálfvarinn slær út strax", v: "0 V", ohm: "0 Ω", pe: "Í lagi", note: "", choice: "Skammhlaup" },
-    { id: "openN", clue: "Dautt, sjálfvari inni", v: "0 V", ohm: "Opin", pe: "Í lagi", note: "", choice: "Núll rofið" },
-    { id: "earth", clue: "Spenna til, lekaliði slær", v: "230 V", ohm: "Í lagi", pe: "Opin", note: "", choice: "Jörð laus" },
-    { id: "small", clue: "Ofn slær út", v: "230 V", ohm: "Í lagi", pe: "Í lagi", note: "10A á ofni", choice: "Of lítið sjálfvari" },
-    { id: "leak", clue: "Lekaliði slær við snertingu", v: "230 V", ohm: "Í lagi", pe: "Leki", note: "", choice: "Leki til jarðar" }
+    { id: "openN", clue: "Dautt, sjálfvarinn inni", v: "0 V", ohm: "Opin", pe: "Í lagi", note: "Núll mælist ekki á tæki", choice: "Núll rofið" },
+    { id: "earth", clue: "Tæki virkar, en jörð finnst ekki", v: "230 V", ohm: "Í lagi", pe: "Opin", note: "", choice: "Jörð laus" },
+    { id: "small", clue: "Ofn slær út sjálfvarann", v: "230 V", ohm: "Í lagi", pe: "Í lagi", note: "Ofn 3 kW á 10A sjálfvari", choice: "Of lítið sjálfvar" },
+    { id: "leak", clue: "Lekaliði slær út þegar tækið er tengt", v: "230 V", ohm: "Í lagi", pe: "Útleiðsla", note: "", choice: "Leki til jarðar" }
   ];
+
 
   function good(id) {
     for (var i = 0; i < GOODS.length; i++) if (GOODS[i].id === id) return GOODS[i];
@@ -514,15 +516,15 @@
     { id: "shop", name: "Verkstæði", desc: "Settu upp verkstæði.", test: function (s) { return s.upgrades.indexOf("verkstadi") >= 0; } },
     { id: "solar", name: "Sólarþak", desc: "Settu upp sólarþak.", test: function (s) { return s.upgrades.indexOf("solar") >= 0; } },
     { id: "lvl3", name: "Sveinn", desc: "Náðu sveinsþrepi.", test: function (s) { return levelOf(s.xp).current.level >= 3; } },
-    { id: "lvl6", name: "Verktaki", desc: "Stofnaðu firma.", test: function (s) { return levelOf(s.xp).current.level >= 6; } },
-    { id: "lvl10", name: "Kóngur", desc: "Vertu rafvirkjakóngur.", test: function (s) { return levelOf(s.xp).current.level >= 10; } },
+    { id: "lvl6", name: "Löggiltur", desc: "Fáðu löggildingu rafverktaka.", test: function (s) { return levelOf(s.xp).current.level >= 6; } },
+    { id: "lvl10", name: "Kóngur", desc: "Vertu rafmagnskóngur.", test: function (s) { return levelOf(s.xp).current.level >= 10; } },
     { id: "million", name: "Milljón", desc: "Nettó eign yfir milljón.", test: function (s) { return netWorth(s) >= 1000000; } },
     { id: "allcities", name: "Landið um kring", desc: "Heimsæktu alla staði.", test: function (s) { return s.stats.visited.length >= LOCS.length; } },
     { id: "streak7", name: "Vika í röð", desc: "Mættu 7 daga í röð.", test: function (s) { return s.stats.loginStreak >= 7; } },
     { id: "jackpot", name: "Stórsamningur", desc: "Kláraðu stórsamning.", test: function (s) { return s.stats.jackpots >= 1; } },
     { id: "fullvan", name: "Fullur bíll", desc: "Fylltu bílinn.", test: function (s) { return usedSpace(s) >= capacity(s); } },
     { id: "sold50", name: "Sölumaður", desc: "Seldu 50 einingar.", test: function (s) { return s.stats.soldQty >= 50; } },
-    { id: "plant", name: "Virkjun", desc: "Kláraðu virkjunarverkefni.", test: function (s) { return s.stats.plantWins >= 1; } }
+    { id: "plant", name: "Aðaltafla", desc: "Kláraðu aðaltöflu í nýbyggingu.", test: function (s) { return s.stats.plantWins >= 1; } }
   ];
 
   function earnAchievement(state) {
@@ -676,7 +678,7 @@
     });
     rows.push({
       id: "fasi",
-      label: "Fasi",
+      label: "Fasi (L1)",
       answer: "brun",
       options: [
         { id: "brun", label: "Brúnn" },
@@ -686,16 +688,17 @@
     });
     rows.push({
       id: "rcd",
-      label: "Bað á lekaliða",
-      answer: "ja",
+      label: "Lekaliði á tenglum",
+      answer: "30A",
       options: [
-        { id: "ja", label: "Já" },
-        { id: "nei", label: "Nei" }
+        { id: "30A", label: "30 mA, gerð A" },
+        { id: "30AC", label: "30 mA, gerð AC" },
+        { id: "300A", label: "300 mA, gerð A" }
       ]
     });
     return {
       rows: rows,
-      rule: "10A ljós. 16A innstungur og þvottavél. 20A eldhús og ofn. 25A hitari. Fasi brúnn. Bað á lekaliða."
+      rule: "10A á 1,5 mm². 16A á 2,5 mm². 25A á 4 mm². 32A á 6 mm². Fasi brúnn. Tenglar í íbúð: lekaliði 30 mA, ekki gerð AC."
     };
   }
 
@@ -711,7 +714,7 @@
     return {
       wires: makeWires(rng, 8),
       rule: seen < 2
-        ? "Brúnn, svartur, grár: fasi. Blár: núll. Gul-grænn: jörð."
+        ? "Brúnn, svartur, grár: fasar L1, L2, L3. Blár: núll. Gul-grænn: jörð."
         : "Fasi, núll, jörð."
     };
   }
@@ -762,7 +765,7 @@
       loads: loads,
       solution: solved.assign,
       bestSpread: solved.spread,
-      rule: "Settu álag á L1, L2 og L3. Gerðu sumurnar jafnar."
+      rule: "Dreifðu álaginu jafnt á L1, L2 og L3. Sem minnstur munur á milli fasa."
     };
   }
 
@@ -846,35 +849,39 @@
 
   function makeIdnadur(rng) {
     var motor = pick(rng, MOTORS);
-    var br = breakerForAmps(motor.amps);
     var cable = cableForAmps(motor.amps);
     var over = String(motor.amps);
-    var breakerOpts = withDecoys(br, ["10", "16", "20", "25", "32", "40"], rng, 4).map(function (id) {
-      return { id: id, label: id + "A" };
+    var cableOpts = withDecoys(cable, ["2,5", "4", "6", "10"], rng, 4).map(function (id) {
+      return { id: id, label: id + " mm²" };
     });
-    var cableOpts = withDecoys(cable, ["1,5", "2,5", "4", "6", "10"], rng, 4).map(function (id) {
-      return { id: id, label: id };
-    });
-    var overPool = ["6", "8", "11", "15", "22", "30", "40"];
-    var overOpts = withDecoys(over, overPool, rng, 4).map(function (id) {
+    var overOpts = withDecoys(over, ["8", "11", "15", "22", "30", "40"], rng, 4).map(function (id) {
       return { id: id, label: id + "A" };
     });
     return {
       kw: motor.kw,
       rows: [
-        { id: "snertill", label: "Snertill", answer: "ja", options: [{ id: "ja", label: "Já" }, { id: "nei", label: "Nei" }] },
-        { id: "breaker", label: "Sjálfvari", answer: br, options: breakerOpts },
-        { id: "cable", label: "Kapall", answer: cable, options: cableOpts },
-        { id: "over", label: "Yfirálag", answer: over, options: overOpts }
+        {
+          id: "snertill",
+          label: "Ræsir",
+          answer: "snertill",
+          options: [
+            { id: "snertill", label: "Snertill og yfirálagsliði" },
+            { id: "rofi", label: "Bara ljósarofi" },
+            { id: "sjalfvar", label: "Bara sjálfvar" }
+          ]
+        },
+        { id: "over", label: "Yfirálagsliði stilltur á", answer: over, options: overOpts },
+        { id: "cable", label: "Strengur", answer: cable, options: cableOpts }
       ],
-      rule: "Mótor " + motor.kw + " kW. Straumur ≈ kW × 2. Sjálfvari næst fyrir ofan. Yfirálag = straumur. Kapall: 1,5 til 10A, 2,5 til 16A, 4 til 25A, 6 til 32A, annars 10. Alltaf snertill."
+      rule: "Mótor " + motor.kw + " kW, 3x400 V. Straumur ≈ kW × 2. Yfirálagsliði stilltur á strauminn. Strengur: að 16A 2,5 mm², að 25A 4 mm², að 32A 6 mm²."
     };
   }
 
   function makeHledsla(rng) {
     var variants = [
-      { title: "11 kW, þrír fasar", breaker: "20", cable: "4" },
-      { title: "7 kW, einn fasi", breaker: "40", cable: "10" }
+      { title: "11 kW, þrír fasar", breaker: "16", cable: "4" },
+      { title: "22 kW, þrír fasar", breaker: "32", cable: "10" },
+      { title: "7 kW, einn fasi", breaker: "32", cable: "10" }
     ];
     var v = pick(rng, variants);
     return {
@@ -882,32 +889,32 @@
       rows: [
         {
           id: "breaker",
-          label: "Sjálfvari",
+          label: "Sjálfvar",
           answer: v.breaker,
-          options: withDecoys(v.breaker, ["10", "16", "20", "25", "32", "40"], rng, 4).map(function (id) {
+          options: withDecoys(v.breaker, ["10", "16", "25", "32", "40", "63"], rng, 4).map(function (id) {
             return { id: id, label: id + "A" };
           })
         },
         {
           id: "cable",
-          label: "Kapall",
+          label: "Strengur",
           answer: v.cable,
-          options: withDecoys(v.cable, ["1,5", "2,5", "4", "6", "10"], rng, 4).map(function (id) {
-            return { id: id, label: id };
+          options: withDecoys(v.cable, ["2,5", "4", "6", "10", "16"], rng, 4).map(function (id) {
+            return { id: id, label: id + " mm²" };
           })
         },
         {
           id: "rcd",
-          label: "Lekaliði",
+          label: "Lekaliði 30 mA",
           answer: "B",
           options: [
-            { id: "A", label: "Týpa A" },
-            { id: "B", label: "Týpa B" },
-            { id: "AC", label: "Týpa AC" }
+            { id: "A", label: "Gerð A" },
+            { id: "B", label: "Gerð B" },
+            { id: "AC", label: "Gerð AC" }
           ]
         }
       ],
-      rule: v.title + ". Þrífasa A ≈ kW × 1,5. Einfasa A ≈ kW × 5. Sjálfvari næst fyrir ofan. Kapall: 4 til 25A, 6 til 32A, annars 10. Alltaf týpa B."
+      rule: v.title + ". Þrífasa A ≈ kW × 1,45. Einfasa A ≈ kW × 4,4. Sjálfvar upp í næstu stærð. Samfelld hleðsla: strengur með 25% rými, 16A á 4 mm², 32A á 10 mm². Eigin lekaliði fyrir hverja stöð. Stöð án DC lekavarnar: gerð B."
     };
   }
 
@@ -926,7 +933,7 @@
         },
         {
           id: "breaker",
-          label: "Sjálfvari",
+          label: "Sjálfvar",
           answer: "16",
           options: [
             { id: "10", label: "10A" },
@@ -937,30 +944,30 @@
         },
         {
           id: "cable",
-          label: "Kapall",
+          label: "Strengur",
           answer: "2,5",
           options: [
-            { id: "1,5", label: "1,5" },
-            { id: "2,5", label: "2,5" },
-            { id: "6", label: "6" },
-            { id: "10", label: "10" }
+            { id: "1,5", label: "1,5 mm²" },
+            { id: "2,5", label: "2,5 mm²" },
+            { id: "6", label: "6 mm²" },
+            { id: "10", label: "10 mm²" }
           ]
         }
       ],
-      rule: "Úti, ekki við svefnherbergi, ekki inni. 16A og 2,5."
+      rule: "Útieining úti, ekki undir svefnglugga, ekki inni. Framleiðandi: 16A sjálfvar og 3G2,5 strengur."
     };
   }
 
   function makeNod(seen) {
     return {
-      order: ["lek", "adal", "ljos", "inn"],
+      order: ["adal", "lek", "ljos", "inn"],
       buttons: shuffleIds([
-        { id: "lek", label: "Lekaliði" },
         { id: "adal", label: "Aðalrofi" },
-        { id: "ljos", label: "Ljós" },
-        { id: "inn", label: "Innstungur" }
+        { id: "lek", label: "Lekaliði" },
+        { id: "ljos", label: "Ljósagrein" },
+        { id: "inn", label: "Tenglagrein" }
       ]),
-      rule: seen < 2 ? "Lekaliði, aðalrofi, ljós, innstungur." : "Öryggi fyrst."
+      rule: seen < 2 ? "Spennusettu frá inntaki og niður: aðalrofi, lekaliði, ljósagrein, tenglagrein." : "Frá inntaki og niður."
     };
   }
 
@@ -988,7 +995,7 @@
           rows: [
             {
               id: "breaker",
-              label: "Aðaltaug 25 kW",
+              label: "Aðalrofi, 25 kW þrífasa",
               answer: feederBr,
               options: withDecoys(feederBr, ["25", "32", "40", "63"], rng, 4).map(function (id) {
                 return { id: id, label: id + "A" };
@@ -996,30 +1003,30 @@
             },
             {
               id: "cable",
-              label: "Kapall aðaltaugar",
+              label: "Strengur í töflu",
               answer: feederCable,
               options: withDecoys(feederCable, ["4", "6", "10", "16"], rng, 4).map(function (id) {
-                return { id: id, label: id };
+                return { id: id, label: id + " mm²" };
               })
             }
           ]
         }
       ],
-      rule: "Þrjú skref. Tafla, litir, aðaltaug. 25 kW þrífasa, A ≈ kW × 1,5. Sjálfvari næst fyrir ofan. Kapall 10 ef yfir 32A."
+      rule: "Þrjú skref. Greinar, litir, aðaltafla. 25 kW þrífasa, A ≈ kW × 1,45. Aðalrofi upp í næstu stærð. Strengur 10 mm² yfir 32A."
     };
   }
 
   var JOB_TYPES = [
-    { id: "litir", name: "Litir og vírar", blurb: "Fasi, núll, jörð", seconds: 22, pay: 9000, xp: 16, level: 1, pace: "fast", mat: null, make: function (rng, state, seen) { return makeLitir(rng, seen); } },
-    { id: "nod", name: "Neyðarviðgerð", blurb: "Rétt röð, hratt", seconds: 16, pay: 10000, xp: 16, level: 2, pace: "fast", mat: null, make: function (rng, state, seen) { return makeNod(seen); } },
+    { id: "litir", name: "Litir á leiðurum", blurb: "Fasi, núll, jörð", seconds: 22, pay: 9000, xp: 16, level: 1, pace: "fast", mat: null, make: function (rng, state, seen) { return makeLitir(rng, seen); } },
+    { id: "nod", name: "Spennusetning", blurb: "Frá inntaki og niður", seconds: 16, pay: 10000, xp: 16, level: 2, pace: "fast", mat: null, make: function (rng, state, seen) { return makeNod(seen); } },
     { id: "bilun", name: "Bilunarleit", blurb: "Mælirinn segir til", seconds: 24, pay: 13000, xp: 22, level: 1, pace: "fast", mat: { good: "maelitaki", qty: 0, bonus: 0.2 }, make: function (rng) { return makeFault(rng); } },
-    { id: "heimili", name: "Heimilistafla", blurb: "Sjálfvarar og litir", seconds: 32, pay: 15000, xp: 24, level: 1, pace: "mid", mat: { good: "sjalfvari", qty: 1, bonus: 0.25 }, make: function (rng) { return makeHeimili(rng); } },
-    { id: "idnadur", name: "Iðnaðartafla", blurb: "Mótor og kapall", seconds: 28, pay: 17000, xp: 24, level: 1, pace: "mid", mat: { good: "snertill", qty: 1, bonus: 0.3 }, make: function (rng) { return makeIdnadur(rng); } },
+    { id: "heimili", name: "Greinitafla", blurb: "Sjálfvör og lekaliði", seconds: 32, pay: 15000, xp: 24, level: 1, pace: "mid", mat: { good: "sjalfvari", qty: 1, bonus: 0.25 }, make: function (rng) { return makeHeimili(rng); } },
+    { id: "idnadur", name: "Mótorgrein", blurb: "Ræsir og strengur", seconds: 28, pay: 17000, xp: 24, level: 1, pace: "mid", mat: { good: "snertill", qty: 1, bonus: 0.3 }, make: function (rng) { return makeIdnadur(rng); } },
     { id: "fasar", name: "Þriggja fasa tafla", blurb: "Jafnaðu L1, L2, L3", seconds: 30, pay: 16000, xp: 24, level: 1, pace: "slow", mat: { good: "sjalfvari", qty: 1, bonus: 0.2 }, make: function (rng) { return makeFasar(rng); } },
-    { id: "leidsla", name: "Leggja leiðslu", blurb: "Stysta leið í plani", seconds: 26, pay: 15000, xp: 22, level: 1, pace: "slow", mat: { good: "kapall25", qty: 1, bonus: 0.25 }, make: function (rng) { return makeRoute(rng); } },
-    { id: "hledsla", name: "Hleðslustöð", blurb: "Straumur og lekaliði", seconds: 24, pay: 24000, xp: 28, level: 3, pace: "mid", mat: { good: "hledsla", qty: 1, bonus: 0.75 }, make: function (rng) { return makeHledsla(rng); } },
-    { id: "pumpa", name: "Varmadæla", blurb: "Staðsettu og tengdu", seconds: 24, pay: 26000, xp: 28, level: 4, pace: "mid", mat: { good: "pumpa", qty: 1, bonus: 0.8 }, make: function () { return makePumpa(); } },
-    { id: "virkjun", name: "Virkjunarverkefni", blurb: "Þrjú skref, stór laun", seconds: 40, pay: 45000, xp: 40, level: 6, pace: "slow", mat: { good: "tafla", qty: 1, bonus: 0.45 }, make: function (rng) { return makeVirkjun(rng); } }
+    { id: "leidsla", name: "Leggja streng", blurb: "Stysta leið í plani", seconds: 26, pay: 15000, xp: 22, level: 1, pace: "slow", mat: { good: "kapall25", qty: 1, bonus: 0.25 }, make: function (rng) { return makeRoute(rng); } },
+    { id: "hledsla", name: "Hleðslustöð", blurb: "Sjálfvar og lekaliði", seconds: 24, pay: 24000, xp: 28, level: 3, pace: "mid", mat: { good: "hledsla", qty: 1, bonus: 0.75 }, make: function (rng) { return makeHledsla(rng); } },
+    { id: "pumpa", name: "Varmadæla", blurb: "Staðsetning og grein", seconds: 24, pay: 26000, xp: 28, level: 4, pace: "mid", mat: { good: "pumpa", qty: 1, bonus: 0.8 }, make: function () { return makePumpa(); } },
+    { id: "virkjun", name: "Aðaltafla í nýbyggingu", blurb: "Þrjú skref, stór laun", seconds: 40, pay: 45000, xp: 40, level: 6, pace: "slow", mat: { good: "tafla", qty: 1, bonus: 0.45 }, make: function (rng) { return makeVirkjun(rng); } }
   ];
 
   function jobType(id) {
@@ -1388,20 +1395,20 @@
   function rollEvent(state, rng) {
     if (rng() > 0.6) return null;
     var pool = [
-      { w: 8, make: function () { return { text: "Vinnueftirlitið sektaði þig.", short: "Sekt", cash: -randInt(rng, 8000, 16000), rep: -6, bad: true }; } },
+      { w: 8, make: function () { return { text: "Skoðunarstofa gerði athugasemd við frágang. Lagfæring kostar.", short: "Athugasemd", cash: -randInt(rng, 8000, 16000), rep: -6, bad: true }; } },
       { w: 8 * vehicleOf(state).theft, when: function (s) { return usedSpace(s) > 0; }, make: function () { return { text: "Verkfæri hurfu úr " + vehicleOf(state).dat + ".", short: "Þjófnaður", theft: true, bad: true }; } },
-      { w: 8, make: function () { return { text: "Útsala. Kaplar á hrakvirði.", short: "Útsala", mul: { ids: ["kapall15", "kapall25", "kapall510"], factor: 0.62 } }; } },
+      { w: 8, make: function () { return { text: "Útsala. Strengir á hrakvirði.", short: "Útsala", mul: { ids: ["kapall15", "kapall25", "kapall510"], factor: 0.62 } }; } },
       { w: 8, make: function () { return { text: "LED ljós hækka í verði.", short: "Verðhækkun", mul: { ids: ["led"], factor: 1.7 } }; } },
       { w: 8, make: function () { return { text: "Viðskiptavinur greiddi reikning.", short: "Reikningur", cash: randInt(rng, 4, 8) * 4000 }; } },
       { w: 2, make: function () { return { text: "Happdrætti. Þú vannst.", short: "Happdrætti", cash: randInt(rng, 14, 24) * 5000 }; } },
       { w: 8, make: function () { return { text: "Þú kenndir nema.", short: "Kennsla", xp: 22, rep: 4 }; } },
       { w: 8 * vehicleOf(state).brk, make: function () { return { text: vehicleOf(state).nom + " bilaði.", short: "Viðgerð", cash: -Math.round(randInt(rng, 6000, 14000) * (0.6 + vehicleOf(state).tier * 0.3) / 100) * 100, bad: true }; } },
-      { w: 8, make: function () { return { text: "Þú fannst kapalbút.", short: "Fundur", grant: { id: "kapall25", qty: randInt(rng, 1, 3) } }; } },
+      { w: 8, make: function () { return { text: "Þú fannst strengbút.", short: "Fundur", grant: { id: "kapall25", qty: randInt(rng, 1, 3) } }; } },
       { w: 4, make: function () { return { text: "Stórsamningur bíður í verkum.", short: "Samningur", forceJackpot: true }; } },
       { w: 8, make: function () { return { text: "Nágranni gaf þjórfé.", short: "Þjórfé", cash: randInt(rng, 5, 12) * 1000, rep: 1 }; } },
       { w: 6, make: function () { return { text: "Ofgreiddur reikningur skilaðist.", short: "Endurgreiðsla", cash: randInt(rng, 8, 18) * 1000 }; } },
-      { w: 8, make: function () { return { text: "Afsláttur af sjálfvörum.", short: "Afsláttur", mul: { ids: ["sjalfvari", "lekavardi"], factor: 0.7 } }; } },
-      { w: 6, make: function () { return { text: "Rok. Aukaútkall borgar vel.", short: "Rok", cash: 15000, xp: 10 }; } }
+      { w: 8, make: function () { return { text: "Afsláttur af sjálfvörum og lekaliðum.", short: "Afsláttur", mul: { ids: ["sjalfvari", "lekavardi"], factor: 0.7 } }; } },
+      { w: 6, make: function () { return { text: "Rok. Útkall utan dagvinnu borgar vel.", short: "Rok", cash: 15000, xp: 10 }; } }
     ];
     var open = pool.filter(function (e) { return !e.when || e.when(state); });
     var total = 0;

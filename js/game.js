@@ -450,6 +450,7 @@
       '<div class="rank"><b>' + L.esc(lv.current.title) + "</b><div>" + L.esc(xpLine) + "</div>" +
       (S.firm ? '<div class="firm">' + L.esc(S.firm) + "</div>" : "") +
       '<div class="fine">Dagar ' + S.day + ". Vika " + S.week + ".</div></div>" +
+      '<h2>Rafmagn á Íslandi</h2><div class="fact"><b>3x400/230 V, 50 Hz.</b> Heimtaug er TN-C (PEN). Núll og jörð skiptast í aðaltöflu. Í elstu hverfum sums staðar 3x230 V (TT). Litir: brúnn L1, svartur L2, grár L3, blár núll, gul-grænn jörð. Eftirlit: HMS. Staðall: ÍST HD 60364 (ÍST HB 200).</div>' +
       "<h2>Fjármál</h2>" +
       '<p class="fine">Glóðarlán. 3% á dag. Banki 2%. Bankinn er öruggur.</p>' +
       '<p class="fine">Vextir á morgun: ' + L.formatKr(L.interestDue(S)) + ". Banki borgar " + L.formatKr(L.bankDue(S)) + ".</p>" +
@@ -1053,6 +1054,7 @@
       '<div class="fine" data-crew-live="note">' + (rate ? (L.formatNum(rate) + " kr á mín. Hámark " + capH + " klst.") : "Ráddu fyrsta starfsmanninn") + "</div>" +
       '<button type="button" class="btn-go' + (pend > 0 ? " pulse" : " dim") + '" data-act="collect" data-crew-live="btn">\ud83d\udcb0 Sæktu</button></div>' +
       '<div class="stack">' + cards + "</div>" +
+      '<div class="fine">Taxti RSÍ frá 1.4.2026: sveinn 627.089 kr á mánuði, um 4.020 kr á klst. í dagvinnu. Nemi á samningi um 67 til 71% af því.</div>' +
       '<h2>Geymsla</h2><div class="stack"><div class="hcard"><span class="ico">\u23f1\ufe0f</span><div class="hbody"><b>' + capH + ' klst. geymsla</b><div>Teymið vinnur líka þegar þú ert í burtu</div></div>' + capBtn + "</div></div></div>";
   }
 

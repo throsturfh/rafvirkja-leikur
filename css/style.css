@@ -648,3 +648,5 @@ button[data-kind="jord"] { border-color: #b6ff5a; }
 .bigbtns button { font-size: 22px; }
 .bigbtns button span { font-size: 11px; }
 .bigbtns .btn-car { background: linear-gradient(180deg, #1fae62, #138a4b); border-color: #5dffa6; box-shadow: 0 4px 0 #08381f; }
+.fact { background: rgba(34, 230, 255, 0.08); border: 1px solid rgba(34, 230, 255, 0.3); border-radius: 14px; padding: 10px 12px; font-size: 13px; line-height: 1.45; color: var(--mute); margin: 4px 10px; }
+.fact b { color: var(--cyan); }
