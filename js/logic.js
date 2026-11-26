@@ -237,6 +237,7 @@
     var c = 36;
     if (state.house) c += houseById(state.house).cap;
     for (var i = 0; i < state.upgrades.length; i++) c += upgradeById(state.upgrades[i]).cap || 0;
+    if (state.bonus && state.bonus.cap) c += state.bonus.cap;
     return c;
   }
 
@@ -258,6 +259,7 @@
   function payMul(state) {
     var m = 1;
     for (var i = 0; i < state.upgrades.length; i++) m += upgradeById(state.upgrades[i]).pay || 0;
+    if (state.bonus && state.bonus.pay) m += state.bonus.pay;
     return m;
   }
 
@@ -355,9 +357,30 @@
     return true;
   }
 
+  function buyPrice(state, goodId) {
+    var p = state.prices[goodId];
+    if (!p) return p;
+    var b = state.bonus && state.bonus.buy ? state.bonus.buy : 0;
+    return b ? Math.max(1, Math.round(p * (1 - b))) : p;
+  }
+
+  function sellPrice(state, goodId) {
+    var p = state.prices[goodId];
+    if (!p) return p;
+    var b = state.bonus && state.bonus.sell ? state.bonus.sell : 0;
+    return b ? Math.round(p * (1 + b)) : p;
+  }
+
+  function grantXp(state, n, rng) {
+    var before = levelOf(state.xp).current.level;
+    state.xp += n;
+    state.today.xp += n;
+    return syncRank(state, before, rng || Math.random);
+  }
+
   function maxAffordable(state, goodId) {
     var g = good(goodId);
-    var price = state.prices[goodId];
+    var price = buyPrice(state, goodId);
     if (!g || !price) return 0;
     var space = capacity(state) - usedSpace(state);
     var bySpace = Math.floor(space / g.size);
@@ -495,7 +518,12 @@
       else if (diff === 1) streak += 1;
       else if (diff === 2 && !meta.login.forgive) {
         meta.login.forgive = true;
+        streak += 1;
         msg = "Þú misstir af einum degi. Röðin helst.";
+      } else if (diff >= 2 && (meta.login.freezes || 0) >= diff - 1) {
+        meta.login.freezes -= diff - 1;
+        streak += 1;
+        msg = "Frystir bjargaði röðinni! \u2744\ufe0f";
       } else {
         streak = 1;
         meta.login.forgive = false;
@@ -503,7 +531,7 @@
     }
     meta.login.streak = streak;
     meta.login.last = today;
-    meta.login.pending = { date: today, amount: streakBonus(streak), streak: streak, msg: msg };
+    meta.login.pending = { date: today, amount: streakBonus(streak), streak: streak, msg: msg, day: ((streak - 1) % 7) + 1 };
     return meta.login;
   }
 
@@ -1007,8 +1035,8 @@
   function buy(state, goodId, qty) {
     var g = good(goodId);
     qty = Math.min(qty, maxAffordable(state, goodId));
-    if (!g || qty < 1) return { ok: false, reason: state.cash < (state.prices[goodId] || 0) ? "cash" : "space" };
-    var price = state.prices[goodId];
+    if (!g || qty < 1) return { ok: false, reason: state.cash < (buyPrice(state, goodId) || 0) ? "cash" : "space" };
+    var price = buyPrice(state, goodId);
     state.cash -= price * qty;
     addInv(state, goodId, qty, price);
     state.stats.bought += 1;
@@ -1022,7 +1050,7 @@
     qty = Math.min(qty, owned);
     if (!g || qty < 1) return { ok: false, reason: "none" };
     var avg = state.inv[goodId].avg;
-    var price = state.prices[goodId];
+    var price = sellPrice(state, goodId);
     var profit = (price - avg) * qty;
     state.cash += price * qty;
     removeInv(state, goodId, qty);
@@ -1487,14 +1515,16 @@
   function sortedGoods(state) {
     var free = capacity(state) - usedSpace(state);
     var list = GOODS.map(function (g) {
-      var price = state.prices[g.id] || g.base;
+      var raw = state.prices[g.id] || g.base;
+      var price = buyPrice(state, g.id) || raw;
+      var sp = sellPrice(state, g.id) || raw;
       var slot = state.inv[g.id];
       var owned = slot ? slot.qty : 0;
       var avg = slot ? slot.avg : 0;
-      var ratio = price / g.base;
-      var sellNow = owned > 0 && price >= avg * 1.12 && price > avg + 40;
+      var ratio = raw / g.base;
+      var sellNow = owned > 0 && sp >= avg * 1.12 && sp > avg + 40;
       var canBuy = price <= state.cash && g.size <= free;
-      return { good: g, price: price, ratio: ratio, owned: owned, avg: avg, sellNow: sellNow, canBuy: canBuy };
+      return { good: g, price: price, sellPrice: sp, ratio: ratio, owned: owned, avg: avg, sellNow: sellNow, canBuy: canBuy };
     });
     list.sort(function (a, b) {
       if (a.sellNow !== b.sellNow) return a.sellNow ? -1 : 1;
@@ -1600,6 +1630,9 @@
     maxAffordable: maxAffordable,
     buy: buy,
     sell: sell,
+    buyPrice: buyPrice,
+    sellPrice: sellPrice,
+    grantXp: grantXp,
     payDebt: payDebt,
     deposit: deposit,
     withdraw: withdraw,

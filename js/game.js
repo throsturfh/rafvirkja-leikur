@@ -5,9 +5,10 @@
   var META_KEY = "rafvirkja-leikur-meta";
   var S = null;
   var Meta = null;
-  var ui = { tab: "markadur", qty: "1", lock: false, jobUid: null, pendingJob: null };
+  var ui = { tab: "markadur", qty: "1", lock: false, jobUid: null, pendingJob: null, queue: [], nextCall: Date.now() + 60000, boardTab: "week", league: null, leagueRows: null };
   var gesture = { x: 0, y: 0, moved: false };
   var C = window.RafCloud;
+  var F = window.RafFun;
   var prevLed = {};
   var GOOD_ICON = {
     innstunga: "\ud83d\udd0c", rofi: "\ud83d\udca1", lekavardi: "\ud83d\udee1\ufe0f", sjalfvari: "\ud83d\udd18",
@@ -34,7 +35,7 @@
         if (m && typeof m === "object") return m;
       }
     } catch (err) { /* ignore broken meta */ }
-    return { best: 0, sound: true, login: null };
+    return { best: 0, sound: true, login: null, tools: {}, week: null, pity: 0, crates: 0 };
   }
 
   function saveMeta() {
@@ -44,10 +45,9 @@
   function commit() {
     try { localStorage.setItem(SAVE, JSON.stringify(S)); } catch (err) { /* private mode */ }
     var sc = L.score(S);
-    if (!Meta.best || sc > Meta.best) {
-      Meta.best = sc;
-      saveMeta();
-    }
+    if (!Meta.best || sc > Meta.best) Meta.best = sc;
+    S.bonus = F.bonuses(Meta.tools);
+    saveMeta();
   }
 
   function repair(s) {
@@ -71,6 +71,7 @@
     if (!s.prices) s.prices = L.rollPrices(s.loc, Math.random);
     L.ensureChallenges(s, new Date());
     if (!s.jobs || !s.jobs.length) s.jobs = L.makeJobs(s, Math.random);
+    ensureExtras(s);
     return s;
   }
 
@@ -117,6 +118,7 @@
   }
 
   function hideOverlay() {
+    if (ui.crate && !ui.crate.done) resolveCrate();
     if (window.RafPuzzles) window.RafPuzzles.destroy();
     var ov = document.getElementById("overlay");
     ov.hidden = true;
@@ -124,8 +126,15 @@
     ov.innerHTML = "";
     ui.lock = false;
     ui.jobUid = null;
+    ui.spinning = false;
+    if (ui.queue.length) setTimeout(runQueue, 160);
   }
 
+  function runQueue() {
+    if (ui.lock || !ui.queue.length) return;
+    var f = ui.queue.shift();
+    f();
+  }
   function render(opts) {
     opts = opts || {};
     var main = document.querySelector(".main");
@@ -218,6 +227,14 @@
     return '<div class="led ' + cls + '"><span>' + label + '</span><b data-led="' + key + '" data-v="' + val + '">' + L.formatNum(val) + "</b></div>";
   }
 
+  function microHTML() {
+    return '<div class="micro">' + (S.micro || []).map(function (g) {
+      var pct = Math.max(4, Math.round(g.have / g.need * 100));
+      return '<div class="mg' + (g.have > 0 ? " go" : "") + '"><div class="mg-t"><i>' + g.icon + "</i><span>" + L.esc(g.label) + "</span></div>" +
+        '<div class="mbar"><span style="width:' + pct + '%"></span></div><div class="mg-r">+' + L.formatNum(g.cash) + "</div></div>";
+    }).join("") + "</div>";
+  }
+
   function headerHTML(pop) {
     var used = L.usedSpace(S);
     var cap = L.capacity(S);
@@ -231,7 +248,7 @@
       '<div class="xpbar"><span style="width:' + xpPct + '%"></span></div></div>' +
       '<div class="day">' + L.esc(L.dayLabel(S)) + "</div>" +
       (S.combo >= 2 ? '<div class="combo">\ud83d\udd25 ' + S.combo + "</div>" : "") +
-      '<button type="button" class="iconbtn" data-act="board" aria-label="Stigatafla">\ud83c\udfc6</button>' +
+      ((S.spins || 0) > 0 ? '<button type="button" class="iconbtn spin" data-act="wheel-open" aria-label="Hjól">\ud83c\udfa1<b>' + S.spins + "</b></button>" : "") +
       '<button type="button" class="iconbtn' + (Meta.sound ? "" : " off") + '" data-act="sound" aria-label="Hljóð">\u266a</button>' +
       "</div>" +
       '<div class="leds' + (pop ? " pop" : "") + '">' +
@@ -240,11 +257,10 @@
       ledHTML("debt", "r", "SKULD", S.debt) +
       '<div class="led y' + hot + '"><span>BÍLL</span><b>' + used + "/" + cap + "</b></div>" +
       "</div>" +
-      '<div class="rep"><span>Orðstír</span><div class="repbar"><span style="width:' + S.rep + '%"></span></div></div>' +
-      goalHTML() +
+      '<button type="button" class="league" id="leaguechip" data-act="board">' + leagueChipHTML() + "</button>" +
+      microHTML() +
       "</header>";
   }
-
   function navHTML(coach) {
     function cls(id) {
       var c = ui.tab === id ? "on" : "";
@@ -256,6 +272,7 @@
       '<button type="button" class="' + cls("markadur") + '" data-act="tab" data-id="markadur"><i>\ud83d\uded2</i>Markaður</button>' +
       '<button type="button" class="' + cls("verk") + '" data-act="tab" data-id="verk"><i>\ud83d\udd27</i>Verk</button>' +
       '<button type="button" class="' + cls("hus") + '" data-act="tab" data-id="hus"><i>\ud83c\udfe0</i>Hús</button>' +
+      '<button type="button" class="' + cls("teymi") + '" data-act="tab" data-id="teymi"><i>\ud83d\udc77</i>Teymi<u class="ndot" hidden></u></button>' +
       '<button type="button" class="' + cls("meira") + '" data-act="tab" data-id="meira"><i>\u2b50</i>Meira</button>' +
       "</nav>";
   }
@@ -316,7 +333,7 @@
     }
     return '<div class="view view-markadur">' +
       '<div class="cities">' + cities + "</div>" +
-      '<div class="goods-col"><div class="toolbar">' +
+      '<div class="goods-col"><div class="toolbar">' + goalHTML() +
       '<div class="qty"><span>Magn</span>' + qtys + "</div>" +
       bonus +
       (line ? '<div class="coach">' + L.esc(line) + "</div>" : "") +
@@ -422,7 +439,11 @@
       return '<div class="ach' + (on ? " on" : "") + '"><b>' + L.esc(a.name) + "</b><span>" + L.esc(a.desc) + "</span></div>";
     }).join("");
     return '<div class="view more-view">' +
-      '<button type="button" class="btn-board" data-act="board">\ud83c\udfc6 Stigatafla</button>' +
+      '<div class="bigbtns"><button type="button" class="btn-board" data-act="board">\ud83c\udfc6<span>Deild</span></button>' +
+      '<button type="button" class="btn-tools" data-act="tools-open">\ud83e\uddf0<span>Verkfæri ' + F.TOOLS.filter(function (t) { return Meta.tools[t.id]; }).length + "/" + F.TOOLS.length + "</span></button>" +
+      '<button type="button" class="btn-wheel2' + ((S.spins || 0) > 0 ? " pulse" : "") + '" data-act="wheel-open">\ud83c\udfa1<span>Hjól ' + (S.spins || 0) + "</span></button></div>" +
+      '<div class="streakbox"><div class="kicker">\ud83d\udd25 Röð: ' + ((Meta.login && Meta.login.streak) || 0) + ' dagar' + (Meta.login && Meta.login.freezes ? " \u2744\ufe0f x" + Meta.login.freezes : "") + "</div>" +
+      calendarHTML((Meta.login && Meta.login.streak) || 1, !!(Meta.login && Meta.login.claimedDate === L.dateStr(new Date()))) + "</div>" +
       '<div class="scorebox"><div class="score">' + L.formatNum(L.score(S)) + '</div><div>Stig. Besta ' + L.formatNum(Meta.best || 0) + "</div>" +
       '<div class="fine">Nettó ' + L.formatKr(L.netWorth(S)) + "</div></div>" +
       '<div class="rank"><b>' + L.esc(lv.current.title) + "</b><div>" + L.esc(xpLine) + "</div>" +
@@ -463,50 +484,56 @@
     var view = "";
     if (ui.tab === "verk") view = jobsHTML();
     else if (ui.tab === "hus") view = houseHTML();
+    else if (ui.tab === "teymi") view = crewHTML();
     else if (ui.tab === "meira") view = moreHTML();
     else view = marketHTML(coach);
     return '<div class="shell">' + headerHTML(pop) + '<main class="main">' + view + "</main>" + navHTML(coach) + "</div>";
   }
 
+  function crateQuality(s) {
+    var r = s.reward;
+    if (!r) return -1;
+    var q = r.ratio >= 0.67 ? 1 : 0;
+    if (r.perfect) q = 2;
+    if (r.perfect && r.speed) q = 3;
+    if (s.callout && r.ratio >= 0.67) q = Math.max(q, 2);
+    if (s.levelUp) q = 3;
+    return q;
+  }
+
   function summaryHTML(s) {
     var hero = "";
     if (s.actionCash) {
-      hero = '<div class="hero ' + (s.actionCash > 0 ? "good" : "bad") + '" data-count="' + s.actionCash + '" data-mode="krs">' + L.formatKrSigned(s.actionCash) + '</div><div class="hero-sub">Gróði</div>';
+      hero = '<div class="hero ' + (s.actionCash > 0 ? "good" : "bad") + '" data-count="' + s.actionCash + '" data-mode="krs">' + L.formatKrSigned(s.actionCash) + '</div>';
     } else if (s.eventText) hero = '<div class="hero neutral">' + L.esc(s.eventText) + "</div>";
     else hero = '<div class="hero neutral">Nýr dagur</div>';
     var xp = s.actionXp ? '<div class="hero-sub xpgain" data-count="' + s.actionXp + '" data-mode="xp">+' + s.actionXp + " reynsla</div>" : "";
     var bits = "";
+    if (s.callout) bits += '<div class="banner">\ud83d\udea8 Neyðarútkall 3x</div>';
     if (s.levelUp) bits += '<div class="levelup"><div class="lu-star">\u26a1</div><div class="lu-k">NÝTT ÞREP</div><div class="lu-n">' + s.levelUp.level + '</div><div class="lu-t">' + L.esc(s.levelUp.title) + "</div></div>";
     if (s.firmNew) bits += '<div class="banner">Firma: ' + L.esc(s.firmNew) + "</div>";
     (s.unlocked || []).forEach(function (u) {
       bits += '<div class="banner">Nýtt: ' + L.esc(u.name) + "</div>";
     });
+    (s.micro || []).forEach(function (m) {
+      bits += '<div class="note good">\u2705 ' + L.esc(m.label) + " +" + L.formatNum(m.cash) + "</div>";
+    });
     if (s.weekBonus) bits += '<div class="banner">Umbun vikunnar ' + L.formatKr(s.weekBonus) + "</div>";
-    if (s.reward && s.reward.speed) bits += '<div class="note good">Hratt</div>';
+    if (s.reward && s.reward.speed) bits += '<div class="note good">\u26a1 Hratt</div>';
     if (s.reward && s.reward.matUsed) bits += '<div class="note good">Lager notaður</div>';
-    if (S.combo >= 2) bits += '<div class="note good">Röð ' + S.combo + "</div>";
+    if (S.combo >= 2) bits += '<div class="note good">\ud83d\udd25 Röð ' + S.combo + "</div>";
     (s.notes || []).forEach(function (n) {
       var amt = n.amount ? " " + L.formatKrSigned(n.amount) : "";
       bits += '<div class="note ' + (n.kind === "bad" ? "bad" : "good") + '">' + L.esc(n.label) + amt + "</div>";
     });
-    if (s.eventText && s.actionCash) bits += '<div class="note">' + L.esc(s.eventText) + "</div>";
     if (s.deal && s.deal.ratio < 0.85) bits += '<div class="note good">Ódýrt: ' + L.esc(s.deal.name) + "</div>";
-    var g = L.goals(S)[0];
-    var goal = "";
-    if (g) {
-      var pct = g.need ? Math.max(4, Math.min(100, Math.round((g.have / g.need) * 100))) : 100;
-      goal = '<div class="nextgoal"><div class="gbar"><span style="width:' + pct + '%"></span></div><b>' +
-        L.esc(g.ready ? ("Tilbúið: " + g.title) : ("Næst: " + g.title)) + "</b><div>" + L.esc(g.detail) + "</div></div>";
-    }
-    var tease = L.tease(S);
+    var q = crateQuality(s);
     return '<div class="sheet">' +
       '<div class="kicker">Dagur ' + s.finishedSlot + " búinn</div>" +
-      '<div class="where">Þú ert ' + L.esc(s.here) + ".</div>" +
-      hero + xp + '<div class="notes">' + bits + "</div>" + goal +
-      (tease ? '<div class="tease">' + L.esc(tease) + "</div>" : "") +
+      hero + xp + (q >= 0 ? crateHTML(q) : "") + '<div class="notes">' + bits + "</div>" +
+      '<button type="button" class="btn-wheel pulse" data-act="wheel-open"' + ((S.spins || 0) > 0 ? "" : " hidden") + '>\ud83c\udfa1 Snúa hjólinu (' + (S.spins || 0) + ")</button>" +
       '<button type="button" class="btn-go" data-act="go-on">Áfram</button></div>';
   }
-
   function presentMorning(summary) {
     ui.lock = true;
     render();
@@ -518,11 +545,11 @@
     if (go) go.focus();
     countUps(ov);
     if (summary.levelUp) burst(ov.querySelector(".sheet"));
-    else if (summary.reward && summary.reward.perfect) burst(ov.querySelector(".sheet"));
     reactMorning(summary);
+    var q = crateQuality(summary);
+    if (q >= 0) startCrate(q, {});
     cloudSync(true);
   }
-
   function reactMorning(summary) {
     var r = summary.reward;
     if (r) {
@@ -543,22 +570,6 @@
     (summary.gained || []).forEach(function (a) { toast("Afrek: " + a.name, "gold"); });
     (summary.challenges || []).forEach(function (c) { toast("Áskorun. " + c.label, "gold"); });
     if (summary.weekBonus) toast("Umbun vikunnar " + L.formatKr(summary.weekBonus), "gold");
-  }
-
-  function showBonus() {
-    var p = Meta.login && Meta.login.pending;
-    if (!p) return;
-    ui.lock = true;
-    var ov = document.getElementById("overlay");
-    ov.hidden = false;
-    ov.className = "sheetmode";
-    ov.innerHTML = '<div class="sheet bonus">' +
-      '<div class="kicker">Dagleg umbun</div>' +
-      '<div class="hero good">' + L.formatKr(p.amount) + "</div>" +
-      '<div class="hero-sub">' + p.streak + ". dagur í röð</div>" +
-      (p.msg ? '<p class="fine">' + L.esc(p.msg) + "</p>" : "") +
-      '<button type="button" class="btn-go" data-act="bonus-take">Taka</button>' +
-      '<button type="button" data-act="bonus-later">Síðar</button></div>';
   }
 
   function showConfirm() {
@@ -601,40 +612,663 @@
   function submitName(rename) {
     var inp = document.getElementById("pname");
     if (C) C.setName(inp ? inp.value : "");
+    if (rename) {
+      hideOverlay();
+      render();
+      cloudSync(true);
+      return;
+    }
+    var amt = Meta.login && Meta.login.pending ? Meta.login.pending.amount : 0;
+    var res = L.claimLogin(S, Meta);
+    commit();
     hideOverlay();
-    render();
-    if (!rename && Meta.login && Meta.login.pending) showBonus();
-    cloudSync(true);
-  }
-
-  function showBoard() {
+    ui.afterWelcome = true;
+    render({ pop: true });
+    if (res) earn(res.amount);
     ui.lock = true;
     var ov = document.getElementById("overlay");
     ov.hidden = false;
     ov.className = "sheetmode";
-    ov.innerHTML = '<div class="sheet board"><div class="kicker">\ud83c\udfc6 Stigatafla</div>' +
-      '<div class="rows" id="boardrows"><p class="fine">Hleð...</p></div>' +
-      '<button type="button" class="btn-go" data-act="go-on">Loka</button></div>';
+    ov.innerHTML = '<div class="sheet cratesheet"><div class="kicker">\ud83c\udf89 Velkomin(n), ' + L.esc(C.name()) + '!</div>' +
+      '<div class="hero good" data-count="' + amt + '" data-mode="krs">+' + L.formatNum(amt) + ' kr</div><div class="hero-sub">Velkomingjöf</div>' + crateHTML(2) +
+      '<button type="button" class="btn-go" data-act="go-on">Fyrsta verk!</button></div>';
+    countUps(ov);
+    if (sfx()) sfx().win();
+    startCrate(2, { forceTool: true });
     cloudSync(true);
-    if (!C) return;
+  }
+  /* ================= extras: crates, wheel, tools, crew, league, callouts ================= */
+
+  function ensureExtras(s) {
+    if (typeof s.spins !== "number") s.spins = 0;
+    if (typeof s.jobsSinceSpin !== "number") s.jobsSinceSpin = 0;
+    F.crewInit(s, Date.now());
+    if (!s.micro || !s.micro.length) {
+      if (!s.stats || !s.stats.jobs) F.firstGoals(s, Math.random);
+      else F.fillGoals(s, Math.random);
+    }
+    s.bonus = F.bonuses(Meta ? Meta.tools : {});
+    return s;
+  }
+
+  function queueSheet(fn) {
+    if (ui.lock) ui.queue.push(fn);
+    else fn();
+  }
+
+  function earn(kr) {
+    if (!kr || kr <= 0 || !Meta || !Meta.week) return;
+    var t = F.gain(Meta, kr);
+    updateLeague();
+    if (t >= 0) promote(t);
+  }
+
+  function promote(t) {
+    var tier = F.TIERS[t];
+    var lv = L.levelOf(S.xp).current.level;
+    var bonus = F.unit(lv) * 5 * t;
+    S.cash += bonus;
+    S.spins = (S.spins || 0) + 1;
+    commit();
+    queueSheet(function () { showPromo(t, bonus); });
+  }
+
+  function showPromo(t, bonus) {
+    var tier = F.TIERS[t];
+    ui.lock = true;
+    var ov = document.getElementById("overlay");
+    ov.hidden = false;
+    ov.className = "sheetmode";
+    ov.innerHTML = '<div class="sheet promo tier' + t + '"><div class="kicker">UPPFÆRSLA</div>' +
+      '<div class="pr-ico">' + tier.icon + '</div><div class="pr-t">' + L.esc(tier.id.toUpperCase()) + 'DEILD!</div>' +
+      '<div class="hero good" data-count="' + bonus + '" data-mode="krs">+' + L.formatNum(bonus) + ' kr</div>' +
+      '<div class="hero-sub">og frítt hjól \ud83c\udfa1</div>' +
+      '<button type="button" class="btn-go" data-act="go-on">Áfram</button></div>';
+    countUps(ov);
+    burst(ov.querySelector(".sheet"));
+    render({ keepScroll: true });
+    if (sfx()) sfx().level();
+    cloudSync(true);
+  }
+
+  function showWeekEnd(prev) {
+    var tier = F.TIERS[prev.tier || 0];
+    var lv = L.levelOf(S.xp).current.level;
+    var bonus = F.unit(lv) * 3 * (1 + (prev.tier || 0));
+    S.cash += bonus;
+    commit();
+    ui.lock = true;
+    var ov = document.getElementById("overlay");
+    ov.hidden = false;
+    ov.className = "sheetmode";
+    ov.innerHTML = '<div class="sheet promo tier' + (prev.tier || 0) + '"><div class="kicker">NÝ VIKA</div>' +
+      '<div class="pr-ico">' + tier.icon + '</div><div class="pr-t">Síðasta vika: ' + L.esc(tier.id) + '</div>' +
+      '<div class="hero-sub">' + L.formatNum(prev.score) + ' stig</div>' +
+      '<div class="hero good" data-count="' + bonus + '" data-mode="krs">+' + L.formatNum(bonus) + ' kr</div>' +
+      '<div class="hero-sub">Nýtt kapphlaup er hafið!</div>' +
+      '<button type="button" class="btn-go" data-act="go-on">Áfram</button></div>';
+    countUps(ov);
+    burst(ov.querySelector(".sheet"));
+    render({ keepScroll: true });
+    if (sfx()) sfx().win();
+  }
+
+  /* ---------- crates ---------- */
+  function crateHTML(q) {
+    var Q = F.QUALITY[q];
+    return '<div class="crate q' + q + '" id="crate"><div class="crate-k">' + Q.name + '</div><div class="crate-box">' + Q.icon + '</div><div class="crate-out"></div></div>';
+  }
+
+  function startCrate(q, opts) {
+    var host = document.getElementById("crate");
+    if (!host) return;
+    var c = { q: q, opts: opts || {}, done: false, host: host };
+    ui.crate = c;
+    c.t1 = setTimeout(function () { host.classList.add("shake"); if (sfx()) sfx().tick(); }, 300);
+    c.t2 = setTimeout(function () { openCrate(true); }, 1100);
+  }
+
+  function rewardCardHTML(rw, extra) {
+    var cls = "rw tier-" + rw.tier;
+    var body;
+    if (rw.kind === "tool") {
+      var R = F.RARITY[rw.tool.r];
+      cls += " r-" + rw.tool.r;
+      body = '<div class="rw-new">NÝTT VERKFÆRI!</div><div class="rw-i">' + rw.icon + '</div><div class="rw-n">' + L.esc(rw.tool.name) + '</div>' +
+        '<div class="rw-r" style="color:' + R.color + '">' + R.name + '</div><div class="rw-b">' + L.esc(F.bonusText(rw.tool.b)) + "</div>";
+    } else if (rw.kind === "coins") {
+      body = '<div class="rw-i">' + rw.icon + '</div><div class="rw-n">' + L.esc(rw.label) + '</div><div class="rw-a" data-count="' + rw.amount + '" data-mode="krs">+' + L.formatNum(rw.amount) + " kr</div>";
+    } else if (rw.kind === "xp") {
+      body = '<div class="rw-i">' + rw.icon + '</div><div class="rw-n">Reynsla</div><div class="rw-a xp" data-count="' + rw.amount + '" data-mode="xp">+' + rw.amount + " reynsla</div>";
+    } else if (rw.kind === "spin") {
+      body = '<div class="rw-i">' + rw.icon + '</div><div class="rw-n">Frítt hjól!</div><div class="rw-b">Snúðu því strax</div>';
+    } else {
+      body = '<div class="rw-i">' + rw.icon + '</div><div class="rw-n">Frystir</div><div class="rw-b">Bjargar röðinni þinni</div>';
+    }
+    return '<div class="' + cls + '">' + body + "</div>";
+  }
+
+  function afterReward(rw, extra, host) {
+    if (rw.kind === "coins") earn(rw.amount);
+    if (extra && extra.rank && extra.rank.levelUp) toast("Nýtt þrep: " + extra.rank.levelUp.title, "gold");
+    S.bonus = F.bonuses(Meta.tools);
+    commit();
+    render({ keepScroll: true });
+    var big = rw.tier === "jackpot" || rw.tier === "legendary" || rw.tier === "epic" || rw.tier === "big";
+    if (sfx()) { if (big) sfx().level(); else sfx().win(); }
+    if (host && (big || rw.kind === "tool")) burst(host);
+    cloudSync(false);
+  }
+
+  function openCrate(animate) {
+    var c = ui.crate;
+    if (!c || c.done) return;
+    c.done = true;
+    clearTimeout(c.t1);
+    clearTimeout(c.t2);
+    var lv = L.levelOf(S.xp).current.level;
+    var rw = F.rollCrate(c.q, lv, Meta, Math.random, c.opts);
+    var extra = F.applyReward(S, Meta, rw, Math.random);
+    Meta.crates = (Meta.crates || 0) + 1;
+    var host = c.host;
+    var live = animate && host && host.isConnected;
+    if (!live) { afterReward(rw, extra, null); return; }
+    var box = host.querySelector(".crate-box");
+    var frames = ["\ud83d\udcb0", "\ud83c\udf81", "\ud83d\udc8e", "\u2b50", "\ud83e\uddf0", "\ud83d\udc51"];
+    var n = 0;
+    var tease = rw.tier === "small" && Math.random() < 0.6 ? "\ud83d\udc51" : rw.icon;
+    var iv = setInterval(function () {
+      n += 1;
+      if (!host.isConnected) { clearInterval(iv); return; }
+      box.textContent = n >= 4 ? tease : frames[Math.floor(Math.random() * frames.length)];
+      if (sfx()) sfx().tick();
+      if (n >= 5) {
+        clearInterval(iv);
+        host.classList.remove("shake");
+        host.classList.add("open");
+        box.textContent = rw.icon;
+        host.querySelector(".crate-out").innerHTML = rewardCardHTML(rw, extra);
+        countUps(host);
+        afterReward(rw, extra, host);
+      }
+    }, 110);
+  }
+
+  function resolveCrate() {
+    if (ui.crate && !ui.crate.done) openCrate(false);
+  }
+
+  function showCrateSheet(q, opts, title, sub) {
+    ui.lock = true;
+    var ov = document.getElementById("overlay");
+    ov.hidden = false;
+    ov.className = "sheetmode";
+    ov.innerHTML = '<div class="sheet cratesheet"><div class="kicker">' + L.esc(title) + "</div>" + (sub || "") + crateHTML(q) +
+      '<button type="button" class="btn-go" data-act="go-on">Áfram</button></div>';
+    startCrate(q, opts);
+  }
+
+  /* ---------- wheel ---------- */
+  function showWheel() {
+    ui.lock = true;
+    var segs = F.WHEEL.map(function (w, i) { return w.color + " " + (i * 45) + "deg " + ((i + 1) * 45) + "deg"; }).join(",");
+    var icons = F.WHEEL.map(function (w, i) {
+      return '<span style="transform:rotate(' + (i * 45) + 'deg) translateY(-98px)"><i style="transform:rotate(' + (-i * 45) + 'deg)">' + w.icon + "</i></span>";
+    }).join("");
+    var ov = document.getElementById("overlay");
+    ov.hidden = false;
+    ov.className = "sheetmode";
+    ov.innerHTML = '<div class="sheet wheelbox"><div class="kicker">\ud83c\udfa1 Lukkuhjól</div>' +
+      '<div class="wheel-wrap"><div class="pointer">\u25bc</div><div class="wheel" id="wheel" style="background:conic-gradient(from -22.5deg,' + segs + ')">' + icons + '<div class="hub"></div></div></div>' +
+      '<div class="wheel-out" id="wheelout"></div>' +
+      '<button type="button" class="btn-go" id="wheelbtn" data-act="wheel-spin"></button>' +
+      '<button type="button" data-act="go-on">Loka</button></div>';
+    wheelBtn();
+  }
+
+  function wheelBtn() {
+    var b = document.getElementById("wheelbtn");
+    if (!b) return;
+    var n = S.spins || 0;
+    b.textContent = n > 0 ? "Snúa (" + n + ")" : "Ekkert hjól í bili";
+    b.classList.toggle("dim", n < 1 || ui.spinning);
+  }
+
+  function spinWheel() {
+    if (ui.spinning || (S.spins || 0) < 1) return;
+    ui.spinning = true;
+    S.spins -= 1;
+    var idx = F.wheelRoll(Math.random);
+    var d = (Math.random() - 0.5) * 30;
+    var near = false;
+    if (idx === 5 && Math.random() < 0.65) { d = 19; near = true; }
+    else if (idx === 7 && Math.random() < 0.65) { d = -19; near = true; }
+    var angle = 360 * 6 + 360 - (idx * 45 + d);
+    var w = document.getElementById("wheel");
+    document.getElementById("wheelout").innerHTML = "";
+    wheelBtn();
+    w.style.transition = reduceMotion ? "none" : "transform 3.8s cubic-bezier(0.1, 0.75, 0.12, 1)";
+    w.style.transform = "rotate(" + angle + "deg)";
+    var ticks = 0;
+    var iv = setInterval(function () {
+      ticks += 1;
+      if (sfx()) sfx().tick();
+      if (ticks > 26) clearInterval(iv);
+    }, 110 + 0);
     setTimeout(function () {
-      C.top(function (rows) {
-        var box = document.getElementById("boardrows");
-        if (!box) return;
-        if (!rows) { box.innerHTML = '<p class="fine">Ekkert samband. Reyndu aftur síðar.</p>'; return; }
-        if (!rows.length) { box.innerHTML = '<p class="fine">Enginn á töflunni enn.</p>'; return; }
-        var me = C.id();
-        var html = '<div class="brow bhead"><span>#</span><span>Nafn</span><span>Þrep</span><span>Eignir</span></div>';
-        rows.forEach(function (r, i) {
-          var medal = i === 0 ? "\ud83e\udd47" : (i === 1 ? "\ud83e\udd48" : (i === 2 ? "\ud83e\udd49" : String(i + 1)));
-          html += '<div class="brow' + (r.player_id === me ? " me" : "") + (i < 3 ? " top3" : "") + '"><span class="rk">' + medal + '</span>' +
-            '<span class="nm"><b>' + L.esc(r.name) + "</b><em>" + L.esc(r.title) + "</em></span>" +
-            '<span class="lv">' + L.esc(String(r.level)) + "</span>" +
-            '<span class="nw">' + L.formatNum(Number(r.net_worth) || 0) + "</span></div>";
-        });
-        box.innerHTML = html;
+      clearInterval(iv);
+      var lv = L.levelOf(S.xp).current.level;
+      var rw = F.wheelReward(idx, lv, Meta, Math.random);
+      var extra = F.applyReward(S, Meta, rw, Math.random);
+      ui.spinning = false;
+      var out = document.getElementById("wheelout");
+      if (!out) { afterReward(rw, extra, null); return; }
+      out.innerHTML = (near ? '<div class="near">Næstum því stórvinningur! \ud83d\ude31</div>' : "") + rewardCardHTML(rw, extra);
+      countUps(out);
+      afterReward(rw, extra, document.querySelector(".wheelbox"));
+      wheelBtn();
+      w.style.transition = "none";
+      w.style.transform = "rotate(" + (angle % 360) + "deg)";
+    }, reduceMotion ? 50 : 3900);
+  }
+
+  /* ---------- tools collection ---------- */
+  function showTools() {
+    ui.lock = true;
+    var own = Meta.tools || {};
+    var b = F.bonuses(own);
+    var have = F.TOOLS.filter(function (t) { return own[t.id]; }).length;
+    var html = '<div class="sheet toolsbox"><div class="kicker">\ud83e\uddf0 Verkfærasafn ' + have + "/" + F.TOOLS.length + "</div>" +
+      '<div class="tb-sum">' + (F.bonusText(b) ? L.esc(F.bonusText(b)) : "Opnaðu kassa til að finna verkfæri") + "</div>";
+    F.RORDER.forEach(function (r) {
+      var list = F.toolsOf(r);
+      var n = list.filter(function (t) { return own[t.id]; }).length;
+      var done = F.setDone(own, r);
+      html += '<div class="tset r-' + r + (done ? " done" : "") + '"><div class="tset-h"><b style="color:' + F.RARITY[r].color + '">' + F.RARITY[r].name + "</b><span>" + n + "/" + list.length + '</span></div>' +
+        '<div class="gbar"><span style="width:' + Math.round((n / list.length) * 100) + '%"></span></div>' +
+        '<div class="setb">' + (done ? "\u2705 " : "\ud83c\udf81 Safn: ") + L.esc(F.bonusText(F.SETS[r])) + "</div>" +
+        '<div class="tgrid">' + list.map(function (t) {
+          return own[t.id]
+            ? '<div class="tool on r-' + r + '"><i>' + t.icon + "</i><b>" + L.esc(t.name) + "</b><small>" + L.esc(F.bonusText(t.b)) + "</small></div>"
+            : '<div class="tool miss"><i>' + t.icon + "</i><b>???</b><small>Vantar</small></div>";
+        }).join("") + "</div></div>";
+    });
+    html += '<button type="button" class="btn-go" data-act="go-on">Loka</button></div>';
+    var ov = document.getElementById("overlay");
+    ov.hidden = false;
+    ov.className = "sheetmode";
+    ov.innerHTML = html;
+  }
+
+  /* ---------- crew ---------- */
+  function crewHTML() {
+    var lv = L.levelOf(S.xp).current.level;
+    var now = Date.now();
+    var pend = F.crewPending(S, now);
+    var max = F.crewMax(S);
+    var rate = F.crewRate(S);
+    var capH = F.crewCapH(S);
+    var pct = max ? Math.min(100, Math.round(pend / max * 100)) : 0;
+    var capLvl = S.crew.cap || 0;
+    var capBtn = capLvl >= F.CAPCOST.length ? '<div class="mine">Hámark</div>'
+      : '<button type="button" class="' + (S.cash >= F.CAPCOST[capLvl] ? "" : "dim") + '" data-act="crewcap">Geymsla ' + F.CAPH[capLvl + 1] + " klst. " + L.formatNum(F.CAPCOST[capLvl]) + " kr</button>";
+    var cards = F.CREW.map(function (c) {
+      var n = S.crew[c.id] || 0;
+      if (lv < c.lvl) return '<div class="hcard dim"><span class="ico">\ud83d\udd12</span><div class="hbody"><b>' + c.name + '</b><div>Opnast á þrepi ' + c.lvl + "</div></div></div>";
+      var cost = F.crewCost(c, n);
+      return '<div class="hcard"><span class="ico">' + c.icon + '</span><div class="hbody"><b>' + c.name + " x" + n + "</b><div>+" + L.formatNum(c.rate) + ' kr á mín.</div></div>' +
+        '<button type="button" class="' + (S.cash >= cost ? "" : "dim") + '" data-act="hire" data-id="' + c.id + '">Ráða ' + L.formatNum(cost) + " kr</button></div>";
+    }).join("");
+    return '<div class="view crew-view">' +
+      '<div class="collect"><div class="kicker">Teymið vinnur fyrir þig</div>' +
+      '<div class="cl-amt" data-crew-live="amt">' + L.formatNum(pend) + ' kr</div>' +
+      '<div class="gbar"><span data-crew-live="bar" style="width:' + pct + '%"></span></div>' +
+      '<div class="fine" data-crew-live="note">' + (rate ? (L.formatNum(rate) + " kr á mín. Hámark " + capH + " klst.") : "Ráddu fyrsta starfsmanninn") + "</div>" +
+      '<button type="button" class="btn-go' + (pend > 0 ? " pulse" : " dim") + '" data-act="collect" data-crew-live="btn">\ud83d\udcb0 Sæktu</button></div>' +
+      '<div class="stack">' + cards + "</div>" +
+      '<h2>Geymsla</h2><div class="stack"><div class="hcard"><span class="ico">\u23f1\ufe0f</span><div class="hbody"><b>' + capH + ' klst. geymsla</b><div>Teymið vinnur líka þegar þú ert í burtu</div></div>' + capBtn + "</div></div></div>";
+  }
+
+  function coinRain() {
+    if (reduceMotion) return;
+    var box = document.createElement("div");
+    box.className = "rain";
+    var em = ["\ud83e\ude99", "\ud83d\udcb0", "\ud83d\udcb5", "\u2728"];
+    for (var i = 0; i < 34; i++) {
+      var s = document.createElement("i");
+      s.textContent = em[i % em.length];
+      s.style.left = Math.round(Math.random() * 96) + "%";
+      s.style.animationDelay = (Math.random() * 0.7) + "s";
+      s.style.animationDuration = (0.9 + Math.random() * 0.8) + "s";
+      s.style.fontSize = (18 + Math.round(Math.random() * 16)) + "px";
+      box.appendChild(s);
+    }
+    document.body.appendChild(box);
+    setTimeout(function () { if (box.parentNode) box.parentNode.removeChild(box); }, 2200);
+  }
+
+  function collectCrew() {
+    var n = F.crewCollect(S, Date.now());
+    if (n <= 0) { toast("Ekkert að sækja enn", "bad"); return 0; }
+    earn(n);
+    commit();
+    coinRain();
+    toast("+" + L.formatKr(n), "gold");
+    if (sfx()) sfx().level();
+    var m = F.microEvent(S, "crew", n, null, Math.random);
+    render({ keepScroll: true, pop: true });
+    cloudSync(false);
+    return n;
+  }
+
+  function showCrewSheet() {
+    ui.lock = true;
+    var pend = F.crewPending(S, Date.now());
+    var ov = document.getElementById("overlay");
+    ov.hidden = false;
+    ov.className = "sheetmode";
+    ov.innerHTML = '<div class="sheet collectsheet"><div class="kicker">\ud83d\udc77 Teymið er búið að vinna</div>' +
+      '<div class="hero good" id="cs-amt" data-count="' + pend + '" data-mode="kr">' + L.formatNum(pend) + ' kr</div>' +
+      '<button type="button" class="btn-go pulse" data-act="collect-sheet">\ud83d\udcb0 Sæktu</button></div>';
+    countUps(ov);
+  }
+
+  function crewNeedsSheet() {
+    return F.crewRate(S) > 0 && F.crewPending(S, Date.now()) >= 800;
+  }
+
+  /* ---------- league ---------- */
+  function leagueChipHTML() {
+    var t = F.TIERS[Meta.week.tier || 0];
+    var lg = ui.league;
+    var line;
+    if (lg && lg.above) line = '<span class="lg-up">\u2b06 ' + L.esc(lg.above.name) + " er " + L.formatNum(lg.above.diff) + " stig á undan þér</span>";
+    else if (lg && lg.total > 1) line = '<span class="lg-lead">\ud83d\udc51 Þú ert efst/ur!</span>';
+    else line = '<span class="lg-up">Bjóddu vinum í deildina</span>';
+    return '<span class="lg-t">' + t.icon + ' <b data-led="wk" data-v="' + Meta.week.score + '">' + L.formatNum(Meta.week.score) + "</b></span>" + line +
+      (lg && lg.rank ? '<span class="lg-r">#' + lg.rank + "</span>" : "");
+  }
+
+  function updateLeague() {
+    if (!Meta || !Meta.week || !C) return;
+    var res = F.computeLeague(ui.leagueRows || [], C.id(), Meta.week.score, C.name() || "Þú");
+    var prev = ui.league;
+    ui.league = res;
+    if (prev && prev.aboveIds && ui.leagueRows) {
+      res.aboveIds.forEach(function (id) {
+        if (prev.aboveIds.indexOf(id) < 0 && id !== C.id()) {
+          var who = res.rows.filter(function (r) { return r.id === id; })[0];
+          toast("\ud83d\ude31 " + (who ? who.name : "Einhver") + " fór fram úr þér!", "bad");
+          if (sfx()) sfx().bad();
+          var chip0 = document.getElementById("leaguechip");
+          if (chip0) { chip0.classList.remove("flash"); void chip0.offsetWidth; chip0.classList.add("flash"); }
+        }
       });
-    }, 0);
+      prev.aboveIds.forEach(function (id) {
+        if (res.aboveIds.indexOf(id) < 0) {
+          var who2 = res.rows.filter(function (r) { return r.id === id; })[0];
+          toast("\ud83c\udf89 Þú fórst fram úr " + (who2 ? who2.name : "einhverjum") + "!", "gold");
+          if (sfx()) sfx().win();
+        }
+      });
+    }
+    var chip = document.getElementById("leaguechip");
+    if (chip) chip.innerHTML = leagueChipHTML();
+  }
+
+  function refreshLeague(cb) {
+    if (!C || !C.hasName() || !Meta.week) { if (cb) cb(); return; }
+    C.week(Meta.week.id, function (rows) {
+      if (rows) ui.leagueRows = rows;
+      updateLeague();
+      if (cb) cb(!!rows);
+    });
+  }
+
+  function weekLeft() {
+    var d = new Date();
+    var dow = d.getUTCDay() || 7;
+    var next = Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate() + (8 - dow));
+    var ms = Math.max(0, next - d.getTime());
+    var days = Math.floor(ms / 86400000);
+    var hrs = Math.floor((ms % 86400000) / 3600000);
+    return days + " d. " + hrs + " klst.";
+  }
+
+  function boardTabsHTML() {
+    return '<div class="tabs2"><button type="button" class="' + (ui.boardTab === "week" ? "on" : "") + '" data-act="board-tab" data-id="week">Vikan</button>' +
+      '<button type="button" class="' + (ui.boardTab === "all" ? "on" : "") + '" data-act="board-tab" data-id="all">Allir tímar</button></div>';
+  }
+
+  function drawBoard(allRows) {
+    var host = document.getElementById("boardbody");
+    if (!host) return;
+    var tabs = document.getElementById("boardtabs");
+    if (tabs) tabs.innerHTML = boardTabsHTML();
+    var me = C ? C.id() : "";
+    if (ui.boardTab === "all") {
+      if (!allRows) { host.innerHTML = '<p class="fine">Hleð...</p>'; return; }
+      if (allRows === "err") { host.innerHTML = '<p class="fine">Ekkert samband.</p>'; return; }
+      var html = '<div class="brow bhead"><span>#</span><span>Nafn</span><span>Þrep</span><span>Eignir</span></div>';
+      allRows.forEach(function (r, i) {
+        var medal = i === 0 ? "\ud83e\udd47" : (i === 1 ? "\ud83e\udd48" : (i === 2 ? "\ud83e\udd49" : String(i + 1)));
+        html += '<div class="brow' + (r.player_id === me ? " me" : "") + (i < 3 ? " top3" : "") + '"><span class="rk">' + medal + '</span>' +
+          '<span class="nm"><b>' + L.esc(r.name) + "</b><em>" + L.esc(r.title) + "</em></span>" +
+          '<span class="lv">' + L.esc(String(r.level)) + '</span><span class="nw">' + L.formatNum(Number(r.net_worth) || 0) + "</span></div>";
+      });
+      host.innerHTML = html;
+      return;
+    }
+    var lg = ui.league || F.computeLeague([], me, Meta.week.score, C ? C.name() : "Þú");
+    var t = Meta.week.tier || 0;
+    var tier = F.TIERS[t];
+    var next = F.TIERS[t + 1];
+    var pct = next ? Math.min(100, Math.round((Meta.week.score - tier.min) / (next.min - tier.min) * 100)) : 100;
+    var h = '<div class="lg-head"><div class="lg-ico">' + tier.icon + '</div><div><b>' + tier.id + 'deild</b><div class="fine">' + L.formatNum(Meta.week.score) + " stig. Ný vika eftir " + weekLeft() + '</div></div></div>' +
+      '<div class="gbar big"><span style="width:' + pct + '%"></span></div>' +
+      '<div class="fine">' + (next ? (L.formatNum(next.min - Meta.week.score) + " stig í " + next.icon + " " + next.id) : "Hæsta deild!") + "</div>";
+    if (lg.above) h += '<div class="lg-banner up">\u2b06 ' + L.esc(lg.above.name) + " er " + L.formatNum(lg.above.diff) + " stig á undan þér</div>";
+    else if (lg.total > 1) h += '<div class="lg-banner lead">\ud83d\udc51 Þú ert efst/ur!</div>';
+    else h += '<div class="lg-banner">Sendu vinum hlekkinn og keppið!</div>';
+    h += '<div class="brow bhead lg"><span>#</span><span>Nafn</span><span>Munur</span><span>Stig</span></div>';
+    lg.rows.forEach(function (r, i) {
+      var medal = i === 0 ? "\ud83e\udd47" : (i === 1 ? "\ud83e\udd48" : (i === 2 ? "\ud83e\udd49" : String(i + 1)));
+      var diff = r.me ? "" : (r.score > Meta.week.score ? '<b class="dn">+' + L.formatNum(r.score - Meta.week.score) + "</b>" : '<b class="upc">-' + L.formatNum(Meta.week.score - r.score) + "</b>");
+      var isAbove = lg.above && lg.above.id === r.id;
+      var ti = F.TIERS[F.tierIdx(r.score)];
+      h += '<div class="brow lg' + (r.me ? " me" : "") + (isAbove ? " target" : "") + (i < 3 ? " top3" : "") + '"><span class="rk">' + medal + '</span>' +
+        '<span class="nm"><b>' + L.esc(r.name) + (r.me ? " (þú)" : "") + "</b><em>" + ti.icon + " " + ti.id + "</em></span>" +
+        '<span class="df">' + diff + '</span><span class="nw">' + L.formatNum(r.score) + "</span></div>";
+    });
+    host.innerHTML = h;
+  }
+
+  function showBoard() {
+    ui.lock = true;
+    ui.boardTab = ui.boardTab || "week";
+    var ov = document.getElementById("overlay");
+    ov.hidden = false;
+    ov.className = "sheetmode";
+    ov.innerHTML = '<div class="sheet board"><div class="kicker">\ud83c\udfc6 Stigatafla</div><div id="boardtabs"></div>' +
+      '<div class="rows" id="boardbody"><p class="fine">Hleð...</p></div>' +
+      '<button type="button" class="btn-go" data-act="go-on">Loka</button></div>';
+    loadBoard();
+  }
+
+  function loadBoard() {
+    drawBoard(null);
+    cloudSync(true);
+    if (ui.boardTab === "all") {
+      if (!C) return;
+      setTimeout(function () {
+        C.top(function (rows) { drawBoard(rows || "err"); });
+      }, 0);
+    } else {
+      drawBoard(null);
+      setTimeout(function () { refreshLeague(function () { drawBoard(null); }); }, 400);
+    }
+  }
+
+  /* ---------- streak calendar ---------- */
+  function calendarHTML(streak, claimedToday) {
+    var day = ((Math.max(1, streak) - 1) % 7) + 1;
+    var out = '<div class="cal">';
+    for (var d = 1; d <= 7; d++) {
+      var st = d < day || (d === day && claimedToday) ? "done" : (d === day ? "today" : "");
+      out += '<div class="cd ' + st + (d === 7 ? " big" : "") + '"><small>Dagur ' + d + "</small><i>" + (st === "done" ? "\u2705" : F.DAY_ICON[d - 1]) + "</i></div>";
+    }
+    return out + "</div>";
+  }
+
+  function showBonus() {
+    var p = Meta.login && Meta.login.pending;
+    if (!p) return;
+    ui.lock = true;
+    var ov = document.getElementById("overlay");
+    ov.hidden = false;
+    ov.className = "sheetmode";
+    var extra = p.day === 3 ? " + kassi" : (p.day === 5 ? " + kassi og hjól" : (p.day === 7 ? " + STÓR kassi" : ""));
+    ov.innerHTML = '<div class="sheet bonus">' +
+      '<div class="kicker">Dagleg umbun \ud83d\udd25 ' + p.streak + " dagar í röð</div>" +
+      calendarHTML(p.streak, false) +
+      '<div class="hero good" data-count="' + p.amount + '" data-mode="kr">' + L.formatKr(p.amount) + "</div>" +
+      '<div class="hero-sub">' + (extra ? "Dagur " + p.day + extra : "Dagur " + p.day) + "</div>" +
+      (Meta.login.freezes ? '<div class="fine ctr">\u2744\ufe0f Frystir: ' + Meta.login.freezes + "</div>" : "") +
+      (p.msg ? '<p class="fine ctr">' + L.esc(p.msg) + "</p>" : "") +
+      '<button type="button" class="btn-go pulse" data-act="bonus-take">Taka</button>' +
+      '<button type="button" data-act="bonus-later">Síðar</button></div>';
+    countUps(ov);
+  }
+
+  function takeBonus() {
+    var pend = Meta.login && Meta.login.pending;
+    var day = pend ? pend.day : 0;
+    var res = L.claimLogin(S, Meta);
+    if (res) {
+      if (day === 3) ui.queue.unshift(function () { showCrateSheet(1, {}, "Dagur 3: kassi!"); });
+      else if (day === 5) { S.spins = (S.spins || 0) + 1; ui.queue.unshift(function () { showCrateSheet(2, {}, "Dagur 5: kassi og hjól!"); }); }
+      else if (day === 7) ui.queue.unshift(function () { showCrateSheet(3, { forceTool: true, minRarity: "epic" }, "Dagur 7: STÓR KASSI!"); });
+    }
+    saveMeta();
+    commit();
+    hideOverlay();
+    render({ pop: true });
+    if (!res) return;
+    earn(res.amount);
+    toast("+" + L.formatKr(res.amount), "gold");
+    if (sfx()) sfx().coin();
+    celebrate(res);
+    cloudSync(false);
+  }
+
+  /* ---------- call-outs ---------- */
+  function calloutEl() {
+    var el = document.getElementById("callout");
+    if (!el) {
+      el = document.createElement("div");
+      el.id = "callout";
+      el.hidden = true;
+      document.body.appendChild(el);
+    }
+    return el;
+  }
+
+  function spawnCallout() {
+    var lv = L.levelOf(S.xp).current.level;
+    var ids = ["litir", "bilun"];
+    if (lv >= 2) ids.push("nod");
+    var tid = ids[Math.floor(Math.random() * ids.length)];
+    var t = L.JOB_TYPES.filter(function (x) { return x.id === tid; })[0];
+    var info = F.CALLOUTS[Math.floor(Math.random() * F.CALLOUTS.length)];
+    var pay = Math.round(t.pay * (1 + (lv - 1) * 0.16) * 3 / 100) * 100;
+    var job = {
+      uid: "c" + Math.floor(Math.random() * 1e9).toString(36), type: tid, name: "Neyðarútkall", blurb: t.blurb,
+      seconds: Math.min(t.seconds, 18), pay: pay, xp: t.xp * 2, jackpot: false, mat: null, callout: true,
+      data: t.make(Math.random, S, 0)
+    };
+    ui.callout = { state: "live", job: job, info: info, deadline: Date.now() + 22000, total: 22000 };
+    var el = calloutEl();
+    el.hidden = false;
+    el.className = "live";
+    el.innerHTML = '<button type="button" data-act="callout"><span class="co-i">\ud83d\udea8</span><span class="co-b"><b>' + L.esc(info.t) + '</b><em>3x laun: ' + L.formatKr(pay) + ' \u2022 Tapp!</em></span><span class="co-t" id="cotime">22</span></button><div class="co-bar"><span id="cobar"></span></div>';
+    if (sfx()) { sfx().bad(); setTimeout(function () { if (sfx()) sfx().ok(); }, 160); sfx().buzz(40); }
+  }
+
+  function hideCallout() {
+    var el = calloutEl();
+    el.hidden = true;
+    el.innerHTML = "";
+    ui.callout = null;
+    ui.nextCall = Date.now() + 70000 + Math.random() * 60000;
+  }
+
+  function acceptCallout() {
+    var co = ui.callout;
+    if (!co || co.state !== "live" || ui.lock) return;
+    var job = co.job;
+    hideCallout();
+    ui.pendingCallout = job;
+    beginJob(job, false);
+  }
+
+  function tick() {
+    var now = Date.now();
+    if (!S || !Meta) return;
+    var co = ui.callout;
+    if (co) {
+      var el = calloutEl();
+      if (co.state === "live") {
+        if (ui.lock) co.deadline += 1000;
+        var left = (co.deadline - now) / 1000;
+        if (left <= 0) {
+          var lost = co.job.pay;
+          co.state = "missed";
+          co.hide = now + 4500;
+          el.className = "missed";
+          el.innerHTML = '<div class="co-miss"><span class="co-i">\ud83d\ude22</span><span class="co-b"><b>Misstir af ' + L.formatKr(lost) + '</b><em>' + L.esc(co.info.t) + "</em></span></div>";
+          if (sfx()) sfx().bad();
+          S.missed = (S.missed || 0) + lost;
+        } else {
+          var t1 = document.getElementById("cotime");
+          var b1 = document.getElementById("cobar");
+          if (t1) t1.textContent = String(Math.ceil(left));
+          if (b1) b1.style.width = Math.max(0, left * 1000 / co.total * 100) + "%";
+          el.classList.toggle("urgent", left < 7);
+        }
+      } else if (now > co.hide) hideCallout();
+    } else if (!ui.lock && !document.hidden && C && C.hasName() && S.stats && S.stats.jobs >= 1 && now >= ui.nextCall) {
+      spawnCallout();
+    }
+    // crew live
+    var live = document.querySelector("[data-crew-live=amt]");
+    var pend = F.crewPending(S, now);
+    var max = F.crewMax(S);
+    if (live) {
+      live.textContent = L.formatNum(Math.min(pend, max)) + " kr";
+      var bar = document.querySelector("[data-crew-live=bar]");
+      if (bar) bar.style.width = (max ? Math.min(100, pend / max * 100) : 0) + "%";
+      var note = document.querySelector("[data-crew-live=note]");
+      if (note && max && pend >= max) note.textContent = "Fullt! Sæktu núna";
+      var btn = document.querySelector("[data-crew-live=btn]");
+      if (btn) { btn.classList.toggle("dim", pend <= 0); btn.classList.toggle("pulse", pend > 0); }
+    }
+    var dot = document.querySelector(".ndot");
+    if (dot) dot.hidden = !(F.crewRate(S) > 0 && pend >= Math.max(800, max * 0.4));
+  }
+
+  function microDone(list) {
+    if (!list || !list.length) return;
+    var tot = 0;
+    list.forEach(function (m, i) {
+      tot += m.cash;
+      setTimeout(function () { toast("\u2705 " + m.label + " +" + L.formatNum(m.cash), "gold"); }, i * 260);
+    });
+    earn(tot);
+    commit();
+    render({ keepScroll: true, pop: true });
+    var mg = document.querySelector(".micro");
+    if (mg) { mg.classList.remove("flash"); void mg.offsetWidth; mg.classList.add("flash"); }
+    if (sfx()) sfx().win();
   }
 
   function findJob(uid) {
@@ -651,17 +1285,31 @@
     ov.hidden = false;
     ov.className = "full";
     ov.innerHTML = '<div class="puzzle-root"></div>';
-    window.RafPuzzles.mount(ov.querySelector(".puzzle-root"), job, {
+    var tb = S.bonus && S.bonus.time ? S.bonus.time : 0;
+    var run = job;
+    if (tb && !job.callout) {
+      run = {};
+      for (var k in job) if (Object.prototype.hasOwnProperty.call(job, k)) run[k] = job[k];
+      run.seconds = Math.round(job.seconds * (1 + tb));
+    }
+    window.RafPuzzles.mount(ov.querySelector(".puzzle-root"), run, {
       onDone: function (result) {
         if (ui.jobUid !== job.uid) return;
         ui.jobUid = null;
         var summary = L.completeJob(S, job, result, !!useMat, Math.random);
+        if (job.callout) summary.callout = true;
+        var r = summary.reward || {};
+        summary.micro = F.microEvent(S, "job", 1, { perfect: r.perfect, ratio: r.ratio, timeUsed: result.timeUsed }, Math.random);
+        S.jobsSinceSpin = (S.jobsSinceSpin || 0) + 1;
+        if (S.jobsSinceSpin >= 3 || summary.levelUp) { S.jobsSinceSpin = 0; S.spins = (S.spins || 0) + 1; }
+        var pts = (r.pay || 0) + 5000;
+        summary.micro.forEach(function (m) { pts += m.cash; });
         commit();
+        earn(pts);
         presentMorning(summary);
       }
     });
   }
-
   function doBuy(id) {
     var qty = L.tradeQty(S, id, ui.qty, "buy");
     if (qty < 1) {
@@ -679,6 +1327,7 @@
     toast("Keypt " + res.qty + " " + res.name, "good");
     if (sfx()) sfx().coin();
     celebrate(res);
+    microDone(F.microEvent(S, "buy", res.qty, null, Math.random));
   }
 
   function doSell(id) {
@@ -696,6 +1345,12 @@
     toast(msg, res.profit >= 0 ? "good" : "bad");
     if (sfx()) sfx().coin();
     celebrate(res);
+    var md = F.microEvent(S, "sell", res.qty, null, Math.random);
+    if (res.profit > 0) {
+      earn(res.profit);
+      md = md.concat(F.microEvent(S, "profit", res.profit, null, Math.random));
+    }
+    microDone(md);
     cloudSync(false);
   }
 
@@ -751,7 +1406,11 @@
       ui.lock = false;
       return;
     }
+    summary.micro = F.microEvent(S, "travel", 1, null, Math.random);
+    var tp = 0;
+    summary.micro.forEach(function (m) { tp += m.cash; });
     commit();
+    earn(tp);
     presentMorning(summary);
   }
 
@@ -771,6 +1430,7 @@
 
   function fresh() {
     S = L.createState(Math.random, new Date());
+    ensureExtras(S);
     ui.tab = "markadur";
     ui.qty = "1";
     commit();
@@ -780,19 +1440,6 @@
     cloudSync(true);
   }
 
-  function takeBonus() {
-    var res = L.claimLogin(S, Meta);
-    saveMeta();
-    commit();
-    hideOverlay();
-    render({ pop: true });
-    if (res) {
-      toast("+" + L.formatKr(res.amount), "gold");
-      if (sfx()) sfx().coin();
-      celebrate(res);
-    }
-  }
-
   function onClick(e) {
     if (gesture.moved) return;
     var b = e.target.closest("[data-act]");
@@ -800,7 +1447,25 @@
     if (e.target.closest(".puzzle-shell")) return;
     var act = b.getAttribute("data-act");
     var id = b.getAttribute("data-id");
-    if (act === "go-on") { hideOverlay(); render(); return; }
+    if (act === "go-on") {
+      hideOverlay();
+      if (ui.afterWelcome) { ui.afterWelcome = false; ui.tab = "verk"; toast("Taktu fyrsta verkið!", "gold"); }
+      render();
+      return;
+    }
+    if (act === "callout") { acceptCallout(); return; }
+    if (act === "wheel-open") { if (ui.crate && !ui.crate.done) resolveCrate(); if (!ui.spinning) showWheel(); return; }
+    if (act === "wheel-spin") { spinWheel(); return; }
+    if (act === "tools-open") { showTools(); return; }
+    if (act === "board-tab") { ui.boardTab = id; loadBoard(); return; }
+    if (act === "collect-sheet") {
+      collectCrew();
+      var csb = b;
+      csb.setAttribute("data-act", "go-on");
+      csb.textContent = "Áfram";
+      csb.classList.remove("pulse");
+      return;
+    }
     if (act === "name-ok") { submitName(id === "r"); return; }
     if (act === "bonus-take") { takeBonus(); return; }
     if (act === "bonus-later") { hideOverlay(); toast("Umbun bíður", "good"); return; }
@@ -837,6 +1502,20 @@
     if (act === "upgrade") { doUpgrade(id); return; }
     if (act === "debt" || act === "in" || act === "out") { doMoney(act, id); return; }
     if (act === "board") { showBoard(); return; }
+    if (act === "collect") { collectCrew(); return; }
+    if (act === "hire") {
+      var hr = F.crewHire(S, id, Date.now());
+      if (!hr.ok) { toast(hr.reason === "cash" ? "Vantar fé" : "Ekki hægt", "bad"); if (sfx()) sfx().bad(); return; }
+      commit(); render({ keepScroll: true, pop: true });
+      toast("Ráðinn!", "gold"); if (sfx()) sfx().level(); cloudSync(false);
+      return;
+    }
+    if (act === "crewcap") {
+      var cr = F.crewCapUp(S, Date.now());
+      if (!cr.ok) { toast(cr.reason === "cash" ? "Vantar fé" : "Ekki hægt", "bad"); if (sfx()) sfx().bad(); return; }
+      commit(); render({ keepScroll: true, pop: true }); toast("Meiri geymsla!", "gold"); if (sfx()) sfx().win();
+      return;
+    }
     if (act === "rename") { showNamePrompt(true); return; }
     if (act === "new") { showConfirm(); }
   }
@@ -844,18 +1523,28 @@
   function boot() {
     Meta = loadMeta();
     if (typeof Meta.sound !== "boolean") Meta.sound = true;
+    if (!Meta.tools) Meta.tools = {};
+    var prevWeek = F.weekReset(Meta, new Date());
     S = loadState() || L.createState(Math.random, new Date());
+    ensureExtras(S);
     L.ensureChallenges(S, new Date());
     L.checkLogin(Meta, L.dateStr(new Date()));
     if (sfx()) sfx().setEnabled(Meta.sound);
     saveMeta();
     commit();
     render();
-    if (C && !C.hasName()) showNamePrompt(false);
-    else {
-      if (Meta.login && Meta.login.pending) showBonus();
+    if (C && !C.hasName()) {
+      showNamePrompt(false);
+    } else {
+      if (Meta.login && Meta.login.pending) ui.queue.push(showBonus);
+      if (prevWeek && prevWeek.score > 0) ui.queue.push(function () { showWeekEnd(prevWeek); });
+      if (crewNeedsSheet()) ui.queue.push(showCrewSheet);
+      runQueue();
       cloudSync(false);
+      setTimeout(refreshLeague, 1200);
     }
+    setInterval(tick, 1000);
+    setInterval(function () { if (!document.hidden) refreshLeague(); }, 30000);
     document.addEventListener("pointerdown", function (e) {
       gesture.x = e.clientX;
       gesture.y = e.clientY;

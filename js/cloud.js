@@ -57,6 +57,8 @@
   function buildRow(S, meta, L) {
     var lv = L.levelOf(S.xp).current;
     var best = Math.max(meta && meta.best ? meta.best : 0, L.score(S));
+    var F = window.RafFun;
+    var wk = meta && meta.week ? meta.week : {};
     return {
       player_id: load().id,
       name: load().name || "Rafvirki",
@@ -69,7 +71,12 @@
       best_score: Math.max(0, Math.round(best)),
       house: S.house ? L.houseById(S.house).name : "",
       achievements: S.achievements.length,
-      jobs_done: S.stats ? S.stats.jobs : 0
+      jobs_done: S.stats ? S.stats.jobs : 0,
+      week_id: wk.id || "",
+      week_score: Math.max(0, Math.round(wk.score || 0)),
+      league: F && F.TIERS[wk.tier || 0] ? F.TIERS[wk.tier || 0].id : "Brons",
+      tools: meta && meta.tools ? Object.keys(meta.tools).length : 0,
+      streak: meta && meta.login ? (meta.login.streak || 0) : 0
     };
   }
 
@@ -117,9 +124,18 @@
       .catch(function () { cb(null); });
   }
 
+  function week(weekId, cb) {
+    if (typeof fetch !== "function") { cb(null); return; }
+    var q = "?select=player_id,name,week_score,league&week_id=eq." + encodeURIComponent(weekId) + "&order=week_score.desc&limit=50";
+    fetch(URL_BASE + q, { headers: { "apikey": KEY } })
+      .then(function (r) { return r.ok ? r.json() : null; })
+      .then(function (rows) { cb(Array.isArray(rows) ? rows : null); })
+      .catch(function () { cb(null); });
+  }
+
   document.addEventListener("visibilitychange", function () {
     if (document.visibilityState === "hidden") flush(true);
   });
 
-  window.RafCloud = { id: id, name: name, setName: setName, sync: sync, top: top, hasName: function () { return !!load().name; } };
+  window.RafCloud = { id: id, name: name, setName: setName, sync: sync, top: top, week: week, flushNow: function () { flush(false); }, hasName: function () { return !!load().name; } };
 })();
